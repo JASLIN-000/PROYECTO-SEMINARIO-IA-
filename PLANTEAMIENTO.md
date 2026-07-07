@@ -145,7 +145,7 @@ IA para redactar informes.
     y hallazgos debe responder en menos de 3 segundos. RNF-02 Generación
     de informe
 
-La construcción del informe no debe superar 5 segundos en condiciones
+La construcción del informe no debe superar 5 segundos en condiciones
 normales. RNF-03 Integridad de datos Cada hallazgo debe tener un único
 registro y no deben existir duplicados de identificadores. RNF-04
 Usabilidad La pantalla principal debe permitir acceder a los equipos del
