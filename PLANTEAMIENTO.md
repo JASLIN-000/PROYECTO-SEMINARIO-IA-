@@ -20,8 +20,10 @@ Esta plantilla ya contiene ejemplos de equipos, módulos y textos base de observ
 
 La base tecnológica ya fue definida:
 
- DBeaver como herramienta de administración.\
+ NestJS para el backend y la API.
+ Angular con TypeScript para el frontend.
  PostgreSQL como base de datos.
+ DBeaver como herramienta de administración.
 
 2.  Bitácora del problema Problema identificado Actualmente, el técnico
     debe consultar varias fuentes para elaborar un informe: informes
@@ -195,7 +197,6 @@ equipos del
 día.
 
  Si el técnico busca por ID o nombre, filtrar resultados.
-
  Si un hallazgo está abierto, incluirlo como hallazgo que requiere
 cotización.
 
