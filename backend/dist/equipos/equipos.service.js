@@ -5,47 +5,37 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EquiposService = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
+const typeorm_2 = require("typeorm");
+const equipo_entity_1 = require("../common/entities/equipo.entity");
 let EquiposService = class EquiposService {
-    equipos = [
-        {
-            idEquipo: 1,
-            nombreEquipo: 'Compresor principal',
-            acuerdoNivelServicio: 'DH-01',
-            estado: 'Operativo',
-            diaHabil: true,
-        },
-        {
-            idEquipo: 2,
-            nombreEquipo: 'Sistema de bombeo',
-            acuerdoNivelServicio: 'DH-02',
-            estado: 'Mantenimiento',
-            diaHabil: true,
-        },
-        {
-            idEquipo: 3,
-            nombreEquipo: 'Panel eléctrico A',
-            acuerdoNivelServicio: 'DH-03',
-            estado: 'Operativo',
-            diaHabil: false,
-        },
-    ];
+    equiposRepository;
+    constructor(equiposRepository) {
+        this.equiposRepository = equiposRepository;
+    }
     findAll(q) {
-        const term = (q ?? '').toLowerCase().trim();
-        const filtered = this.equipos.filter((equipo) => {
-            if (!term) {
-                return equipo.diaHabil;
-            }
-            return (equipo.nombreEquipo.toLowerCase().includes(term) ||
-                String(equipo.idEquipo).includes(term));
-        });
-        return filtered;
+        const query = this.equiposRepository.createQueryBuilder('equipo');
+        query.where('equipo.diaHabil = :diaHabil', { diaHabil: true });
+        if (q?.trim()) {
+            const term = `%${q.trim().toLowerCase()}%`;
+            query.andWhere('(LOWER(equipo.nombre) LIKE :term OR CAST(equipo.id AS text) LIKE :term)', { term });
+        }
+        return query.getMany();
     }
 };
 exports.EquiposService = EquiposService;
 exports.EquiposService = EquiposService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __param(0, (0, typeorm_1.InjectRepository)(equipo_entity_1.Equipo)),
+    __metadata("design:paramtypes", [typeorm_2.Repository])
 ], EquiposService);
 //# sourceMappingURL=equipos.service.js.map

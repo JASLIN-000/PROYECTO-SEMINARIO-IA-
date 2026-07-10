@@ -1,8 +1,22 @@
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('hallazgos')
 export class Hallazgo {
-  id: number = 0;
-  equipoId: number = 0;
-  estado: string = '';
-  descripcion: string = '';
-  requiereCotizacion: boolean = false;
-  fechaMantenimiento: string = '';
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column()
+  equipoId!: number;
+
+  @Column()
+  estado!: string;
+
+  @Column('text')
+  descripcion!: string;
+
+  @Column({ default: false })
+  requiereCotizacion!: boolean;
+
+  @Column({ type: 'date' })
+  fechaMantenimiento!: string;
 }

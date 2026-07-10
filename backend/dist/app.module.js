@@ -8,18 +8,39 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const equipos_module_1 = require("./equipos/equipos.module");
 const hallazgos_module_1 = require("./hallazgos/hallazgos.module");
 const informes_module_1 = require("./informes/informes.module");
 const plantillas_module_1 = require("./plantillas/plantillas.module");
+const equipo_entity_1 = require("./common/entities/equipo.entity");
+const hallazgo_entity_1 = require("./common/entities/hallazgo.entity");
+const plantilla_entity_1 = require("./common/entities/plantilla.entity");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [equipos_module_1.EquiposModule, hallazgos_module_1.HallazgosModule, informes_module_1.InformesModule, plantillas_module_1.PlantillasModule],
+        imports: [
+            typeorm_1.TypeOrmModule.forRoot({
+                type: 'postgres',
+                host: process.env.DB_HOST || 'localhost',
+                port: Number(process.env.DB_PORT || 5432),
+                username: process.env.DB_USER || 'postgres',
+                password: process.env.DB_PASSWORD || 'postgres',
+                database: process.env.DB_NAME || 'mantenimiento',
+                entities: [equipo_entity_1.Equipo, hallazgo_entity_1.Hallazgo, plantilla_entity_1.Plantilla],
+                synchronize: true,
+                autoLoadEntities: true,
+                logging: false,
+            }),
+            equipos_module_1.EquiposModule,
+            hallazgos_module_1.HallazgosModule,
+            informes_module_1.InformesModule,
+            plantillas_module_1.PlantillasModule,
+        ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })

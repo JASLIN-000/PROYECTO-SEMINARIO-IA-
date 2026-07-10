@@ -9,37 +9,32 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Equipo = void 0;
+exports.Plantilla = void 0;
 const typeorm_1 = require("typeorm");
-let Equipo = class Equipo {
+let Plantilla = class Plantilla {
     id;
-    nombre;
-    acuerdoNivelServicio;
-    estado;
-    diaHabil;
+    modulo;
+    plantillaObservacion;
+    plantillaRecomendacion;
 };
-exports.Equipo = Equipo;
+exports.Plantilla = Plantilla;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
-], Equipo.prototype, "id", void 0);
+], Plantilla.prototype, "id", void 0);
 __decorate([
     (0, typeorm_1.Column)(),
     __metadata("design:type", String)
-], Equipo.prototype, "nombre", void 0);
+], Plantilla.prototype, "modulo", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)('text'),
     __metadata("design:type", String)
-], Equipo.prototype, "acuerdoNivelServicio", void 0);
+], Plantilla.prototype, "plantillaObservacion", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)('text'),
     __metadata("design:type", String)
-], Equipo.prototype, "estado", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: true }),
-    __metadata("design:type", Boolean)
-], Equipo.prototype, "diaHabil", void 0);
-exports.Equipo = Equipo = __decorate([
-    (0, typeorm_1.Entity)('equipos')
-], Equipo);
-//# sourceMappingURL=equipo.entity.js.map
+], Plantilla.prototype, "plantillaRecomendacion", void 0);
+exports.Plantilla = Plantilla = __decorate([
+    (0, typeorm_1.Entity)('plantillas')
+], Plantilla);
+//# sourceMappingURL=plantilla.entity.js.map

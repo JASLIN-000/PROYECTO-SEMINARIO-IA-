@@ -1,9 +1,7 @@
+import { Repository } from 'typeorm';
+import { Plantilla } from '../common/entities/plantilla.entity';
 export declare class PlantillasService {
-    private readonly plantillas;
-    findAll(modulo?: string): {
-        id: number;
-        modulo: string;
-        plantillaObservacion: string;
-        plantillaRecomendacion: string;
-    }[];
+    private readonly plantillasRepository;
+    constructor(plantillasRepository: Repository<Plantilla>);
+    findAll(modulo?: string): Promise<Plantilla[]>;
 }

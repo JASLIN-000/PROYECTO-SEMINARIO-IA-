@@ -1,46 +1,41 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Hallazgo } from '../common/entities/hallazgo.entity';
 
 @Injectable()
 export class HallazgosService {
-  private readonly hallazgos = [
-    {
-      id: 1,
-      equipoId: 1,
-      estado: 'Pendiente',
-      descripcion: 'Vibración anormal en el compresor',
-      requiereCotizacion: true,
-      fechaMantenimiento: '2026-07-01',
-    },
-    {
-      id: 2,
-      equipoId: 1,
-      estado: 'Solucionado',
-      descripcion: 'Se ajustó el sistema de lubricación',
-      requiereCotizacion: false,
-      fechaMantenimiento: '2026-06-20',
-    },
-  ];
+  constructor(
+    @InjectRepository(Hallazgo)
+    private readonly hallazgosRepository: Repository<Hallazgo>,
+  ) {}
 
   findAll(equipoId?: string, estado?: string) {
-    return this.hallazgos.filter((hallazgo) => {
-      const byEquipo = !equipoId || hallazgo.equipoId === +equipoId;
-      const byEstado = !estado || hallazgo.estado.toLowerCase() === estado.toLowerCase();
-      return byEquipo && byEstado;
-    });
+    const query = this.hallazgosRepository.createQueryBuilder('hallazgo');
+
+    if (equipoId) {
+      query.andWhere('hallazgo.equipoId = :equipoId', { equipoId: Number(equipoId) });
+    }
+
+    if (estado) {
+      query.andWhere('LOWER(hallazgo.estado) = :estado', {
+        estado: estado.toLowerCase(),
+      });
+    }
+
+    return query.getMany();
   }
 
   create(body: any) {
-    const nuevo = { id: this.hallazgos.length + 1, ...body };
-    this.hallazgos.push(nuevo);
-    return nuevo;
+    return this.hallazgosRepository.save(body);
   }
 
-  update(id: number, body: any) {
-    const index = this.hallazgos.findIndex((item) => item.id === id);
-    if (index === -1) {
+  async update(id: number, body: any) {
+    const hallazgo = await this.hallazgosRepository.preload({ id, ...body });
+    if (!hallazgo) {
       return null;
     }
-    this.hallazgos[index] = { ...this.hallazgos[index], ...body };
-    return this.hallazgos[index];
+
+    return this.hallazgosRepository.save(hallazgo);
   }
 }

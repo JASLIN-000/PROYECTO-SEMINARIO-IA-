@@ -1,43 +1,27 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Equipo } from '../common/entities/equipo.entity';
 
 @Injectable()
 export class EquiposService {
-  private readonly equipos = [
-    {
-      idEquipo: 1,
-      nombreEquipo: 'Compresor principal',
-      acuerdoNivelServicio: 'DH-01',
-      estado: 'Operativo',
-      diaHabil: true,
-    },
-    {
-      idEquipo: 2,
-      nombreEquipo: 'Sistema de bombeo',
-      acuerdoNivelServicio: 'DH-02',
-      estado: 'Mantenimiento',
-      diaHabil: true,
-    },
-    {
-      idEquipo: 3,
-      nombreEquipo: 'Panel eléctrico A',
-      acuerdoNivelServicio: 'DH-03',
-      estado: 'Operativo',
-      diaHabil: false,
-    },
-  ];
+  constructor(
+    @InjectRepository(Equipo)
+    private readonly equiposRepository: Repository<Equipo>,
+  ) {}
 
   findAll(q?: string) {
-    const term = (q ?? '').toLowerCase().trim();
-    const filtered = this.equipos.filter((equipo) => {
-      if (!term) {
-        return equipo.diaHabil;
-      }
-      return (
-        equipo.nombreEquipo.toLowerCase().includes(term) ||
-        String(equipo.idEquipo).includes(term)
-      );
-    });
+    const query = this.equiposRepository.createQueryBuilder('equipo');
+    query.where('equipo.diaHabil = :diaHabil', { diaHabil: true });
 
-    return filtered;
+    if (q?.trim()) {
+      const term = `%${q.trim().toLowerCase()}%`;
+      query.andWhere(
+        '(LOWER(equipo.nombre) LIKE :term OR CAST(equipo.id AS text) LIKE :term)',
+        { term },
+      );
+    }
+
+    return query.getMany();
   }
 }

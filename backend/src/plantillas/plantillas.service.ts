@@ -1,27 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Plantilla } from '../common/entities/plantilla.entity';
 
 @Injectable()
 export class PlantillasService {
-  private readonly plantillas = [
-    {
-      id: 1,
-      modulo: 'Electrico',
-      plantillaObservacion: 'Se realizó revisión eléctrica del equipo y se verificó el estado general.',
-      plantillaRecomendacion: 'Se recomienda mantener vigilancia en el tablero principal.',
-    },
-    {
-      id: 2,
-      modulo: 'Mecánico',
-      plantillaObservacion: 'Se realizó revisión mecánica del sistema y se registraron hallazgos pendientes.',
-      plantillaRecomendacion: 'Se recomienda revisar el estado de lubricación.',
-    },
-  ];
+  constructor(
+    @InjectRepository(Plantilla)
+    private readonly plantillasRepository: Repository<Plantilla>,
+  ) {}
 
   findAll(modulo?: string) {
-    if (!modulo) {
-      return this.plantillas;
+    const query = this.plantillasRepository.createQueryBuilder('plantilla');
+
+    if (modulo) {
+      query.where('LOWER(plantilla.modulo) = :modulo', {
+        modulo: modulo.toLowerCase(),
+      });
     }
 
-    return this.plantillas.filter((item) => item.modulo.toLowerCase() === modulo.toLowerCase());
+    return query.getMany();
   }
 }

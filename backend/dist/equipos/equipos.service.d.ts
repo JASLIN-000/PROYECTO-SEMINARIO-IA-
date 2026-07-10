@@ -1,10 +1,7 @@
+import { Repository } from 'typeorm';
+import { Equipo } from '../common/entities/equipo.entity';
 export declare class EquiposService {
-    private readonly equipos;
-    findAll(q?: string): {
-        idEquipo: number;
-        nombreEquipo: string;
-        acuerdoNivelServicio: string;
-        estado: string;
-        diaHabil: boolean;
-    }[];
+    private readonly equiposRepository;
+    constructor(equiposRepository: Repository<Equipo>);
+    findAll(q?: string): Promise<Equipo[]>;
 }
