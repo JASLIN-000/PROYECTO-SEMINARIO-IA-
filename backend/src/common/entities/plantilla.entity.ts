@@ -8,9 +8,6 @@ export class Plantilla {
   @Column()
   modulo!: string;
 
-  @Column('text')
-  plantillaObservacion!: string;
-
-  @Column('text')
-  plantillaRecomendacion!: string;
+  @Column('text', { name: 'observacion_estandar' })
+  observacionEstandar!: string;
 }

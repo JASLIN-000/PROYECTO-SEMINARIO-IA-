@@ -20,7 +20,7 @@ import { Plantilla } from './common/entities/plantilla.entity';
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'mantenimiento',
       entities: [Equipo, Hallazgo, Plantilla],
-      synchronize: true,
+      synchronize: false,
       autoLoadEntities: true,
       logging: false,
     }),

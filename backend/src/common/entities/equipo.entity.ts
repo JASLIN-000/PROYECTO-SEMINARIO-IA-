@@ -5,15 +5,15 @@ export class Equipo {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
-  nombre!: string;
+  @Column({ name: 'id_equipo' })
+  idEquipo!: string;
 
-  @Column()
-  acuerdoNivelServicio!: string;
+  @Column({ name: 'nombre_equipo' })
+  nombreEquipo!: string;
+
+  @Column({ name: 'acuerdo_nivel_servicio_dh' })
+  acuerdoNivelServicioDh!: number;
 
   @Column()
   estado!: string;
-
-  @Column({ default: true })
-  diaHabil!: boolean;
 }

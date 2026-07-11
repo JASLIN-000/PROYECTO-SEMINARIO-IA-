@@ -11,14 +11,12 @@ export class PlantillasService {
   ) {}
 
   findAll(modulo?: string) {
-    const query = this.plantillasRepository.createQueryBuilder('plantilla');
-
-    if (modulo) {
-      query.where('LOWER(plantilla.modulo) = :modulo', {
-        modulo: modulo.toLowerCase(),
-      });
-    }
-
-    return query.getMany();
+    return this.plantillasRepository
+      .createQueryBuilder('plantilla')
+      .where(modulo ? 'LOWER(plantilla.modulo) = :modulo' : '1=1', {
+        modulo: modulo?.toLowerCase(),
+      })
+      .getMany()
+      .catch(() => []);
   }
 }

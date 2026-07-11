@@ -5,18 +5,30 @@ export class Hallazgo {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({ name: 'equipo_id' })
   equipoId!: number;
+
+  @Column({ name: 'tipo_mantenimiento' })
+  tipoMantenimiento!: string;
+
+  @Column()
+  modulo!: string;
+
+  @Column('text', { name: 'descripcion_hallazgo' })
+  descripcionHallazgo!: string;
+
+  @Column()
+  cotizacion!: string;
+
+  @Column('text', { nullable: true })
+  observacion!: string | null;
 
   @Column()
   estado!: string;
 
-  @Column('text')
-  descripcion!: string;
+  @Column({ name: 'fecha_hallazgo', type: 'date' })
+  fechaHallazgo!: string;
 
-  @Column({ default: false })
-  requiereCotizacion!: boolean;
-
-  @Column({ type: 'date' })
-  fechaMantenimiento!: string;
+  @Column({ name: 'fecha_solucion', type: 'date', nullable: true })
+  fechaSolucion!: string | null;
 }

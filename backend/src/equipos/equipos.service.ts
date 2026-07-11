@@ -10,18 +10,33 @@ export class EquiposService {
     private readonly equiposRepository: Repository<Equipo>,
   ) {}
 
-  findAll(q?: string) {
-    const query = this.equiposRepository.createQueryBuilder('equipo');
-    query.where('equipo.diaHabil = :diaHabil', { diaHabil: true });
+  async findAll(q?: string) {
+    try {
+      const query = this.equiposRepository.createQueryBuilder('equipo');
 
-    if (q?.trim()) {
-      const term = `%${q.trim().toLowerCase()}%`;
-      query.andWhere(
-        '(LOWER(equipo.nombre) LIKE :term OR CAST(equipo.id AS text) LIKE :term)',
-        { term },
-      );
+      if (q?.trim()) {
+        const term = `%${q.trim().toLowerCase()}%`;
+        query.andWhere(
+          '(LOWER(equipo.nombreEquipo) LIKE :term OR LOWER(equipo.idEquipo) LIKE :term OR CAST(equipo.id AS text) LIKE :term)',
+          { term },
+        );
+      }
+
+      const equipos = await query.getMany();
+
+      return equipos.map((equipo) => ({
+        id: equipo.id,
+        idEquipo: equipo.idEquipo,
+        nombreEquipo: equipo.nombreEquipo,
+        acuerdoNivelServicioDh: equipo.acuerdoNivelServicioDh,
+        estado: equipo.estado,
+        slaDiasHabiles: equipo.acuerdoNivelServicioDh,
+        slaHoras: equipo.acuerdoNivelServicioDh * 24,
+        nombre: equipo.nombreEquipo,
+        acuerdoNivelServicio: `${equipo.acuerdoNivelServicioDh}DH`,
+      }));
+    } catch {
+      return [];
     }
-
-    return query.getMany();
   }
 }
