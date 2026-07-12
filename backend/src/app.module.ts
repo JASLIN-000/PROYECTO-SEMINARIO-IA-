@@ -9,6 +9,7 @@ import { PlantillasModule } from './plantillas/plantillas.module';
 import { Equipo } from './common/entities/equipo.entity';
 import { Hallazgo } from './common/entities/hallazgo.entity';
 import { Plantilla } from './common/entities/plantilla.entity';
+import { Informe } from './common/entities/informe.entity';
 
 @Module({
   imports: [
@@ -17,9 +18,9 @@ import { Plantilla } from './common/entities/plantilla.entity';
       host: process.env.DB_HOST || 'localhost',
       port: Number(process.env.DB_PORT || 5432),
       username: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
+      password: process.env.DB_PASSWORD || 'raul123',
       database: process.env.DB_NAME || 'mantenimiento',
-      entities: [Equipo, Hallazgo, Plantilla],
+      entities: [Equipo, Hallazgo, Plantilla, Informe],
       synchronize: false,
       autoLoadEntities: true,
       logging: false,

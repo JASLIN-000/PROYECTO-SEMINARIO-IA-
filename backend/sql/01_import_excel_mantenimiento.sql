@@ -8,6 +8,7 @@ BEGIN;
 -- 0) REINICIO TOTAL DEL MODELO (DESDE CERO)
 -- Si ya eliminaste tablas manualmente, estos DROP no fallan.
 -- Si aun existen, las elimina para reconstruir todo limpio.
+DROP TABLE IF EXISTS informes CASCADE;
 DROP TABLE IF EXISTS hallazgos CASCADE;
 DROP TABLE IF EXISTS plantillas CASCADE;
 DROP TABLE IF EXISTS equipos CASCADE;
@@ -101,6 +102,7 @@ CREATE TABLE stg_plantillas (
 );
 
 -- 3) TABLAS FINALES
+-- TABLAS FINALES FUNCIONALES DEL MVP: equipos, plantillas, hallazgos, informes.
 CREATE TABLE equipos (
   id BIGSERIAL PRIMARY KEY,
   id_equipo VARCHAR(30) NOT NULL UNIQUE,
@@ -142,10 +144,31 @@ CREATE TABLE hallazgos (
     CHECK (fecha_solucion IS NULL OR fecha_solucion >= fecha_hallazgo)
 );
 
+CREATE TABLE informes (
+  id BIGSERIAL PRIMARY KEY,
+  mantenimiento_id INTEGER NULL,
+  equipo_id BIGINT NULL,
+  modulos_text TEXT NOT NULL DEFAULT '[]',
+  observaciones TEXT NOT NULL,
+  pendientes TEXT,
+  recomendaciones TEXT,
+  plantillas_aplicadas_text TEXT NOT NULL DEFAULT '[]',
+  fecha_generacion TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_informes_equipo
+    FOREIGN KEY (equipo_id)
+    REFERENCES equipos(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_equipos_estado ON equipos(estado);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_equipo_id ON hallazgos(equipo_id);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_estado ON hallazgos(estado);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_modulo ON hallazgos(modulo);
+CREATE INDEX IF NOT EXISTS idx_informes_equipo_id ON informes(equipo_id);
+CREATE INDEX IF NOT EXISTS idx_informes_fecha_generacion ON informes(fecha_generacion DESC);
 
 DROP TRIGGER IF EXISTS trg_equipos_updated_at ON equipos;
 CREATE TRIGGER trg_equipos_updated_at
@@ -162,6 +185,12 @@ EXECUTE FUNCTION fn_set_updated_at();
 DROP TRIGGER IF EXISTS trg_plantillas_updated_at ON plantillas;
 CREATE TRIGGER trg_plantillas_updated_at
 BEFORE UPDATE ON plantillas
+FOR EACH ROW
+EXECUTE FUNCTION fn_set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_informes_updated_at ON informes;
+CREATE TRIGGER trg_informes_updated_at
+BEFORE UPDATE ON informes
 FOR EACH ROW
 EXECUTE FUNCTION fn_set_updated_at();
 
@@ -265,6 +294,8 @@ COMMIT;
 -- SELECT 'plantillas', COUNT(*) FROM plantillas
 -- UNION ALL
 -- SELECT 'hallazgos', COUNT(*) FROM hallazgos;
+-- UNION ALL
+-- SELECT 'informes', COUNT(*) FROM informes;
 
 -- Hallazgos huerfanos (debe ser 0 por FK)
 -- SELECT COUNT(*) FROM hallazgos h

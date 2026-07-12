@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { HallazgosService } from './hallazgos.service';
 
 @Controller('hallazgos')
@@ -17,6 +17,11 @@ export class HallazgosController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: any) {
+    return this.hallazgosService.update(+id, body);
+  }
+
+  @Put(':id')
+  replace(@Param('id') id: string, @Body() body: any) {
     return this.hallazgosService.update(+id, body);
   }
 }

@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Pruebas API Mantenimiento</title>
+    <style>
+      :root {
+        --bg: #f4efe7;
+        --panel: rgba(255, 250, 243, 0.92);
+        --ink: #1f2a2e;
+        --muted: #5b6a70;
+        --line: rgba(31, 42, 46, 0.12);
+        --brand: #0e7c66;
+        --brand-strong: #095646;
+        --accent: #d66b2d;
+        --shadow: 0 20px 50px rgba(31, 42, 46, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Georgia, 'Times New Roman', serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(214, 107, 45, 0.15), transparent 32%),
+          radial-gradient(circle at top right, rgba(14, 124, 102, 0.14), transparent 26%),
+          linear-gradient(135deg, #f7f1e8 0%, #efe5d7 100%);
+      }
+
+      .layout {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+
+      .badge {
+        width: fit-content;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(14, 124, 102, 0.1);
+        color: var(--brand-strong);
+        font: 700 12px/1.1 'Segoe UI', sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.2rem, 4vw, 4.3rem);
+        line-height: 0.95;
+        max-width: 10ch;
+      }
+
+      .subtitle {
+        max-width: 58ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+
+      .tips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      .tip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.55);
+        font: 600 13px/1.1 'Segoe UI', sans-serif;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 18px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(12px);
+      }
+
+      .panel-inner {
+        padding: 20px;
+      }
+
+      .section-title {
+        margin: 0 0 6px;
+        font-size: 1.35rem;
+      }
+
+      .section-copy {
+        margin: 0 0 18px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .endpoint-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .endpoint {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      .endpoint header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .method {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 58px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: var(--brand);
+        color: white;
+        font: 700 12px/1 'Segoe UI', sans-serif;
+        letter-spacing: 0.08em;
+      }
+
+      .route {
+        font: 600 14px/1.2 Consolas, monospace;
+        color: var(--brand-strong);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 14px;
+        background: var(--brand);
+        color: white;
+        font: 700 13px/1 'Segoe UI', sans-serif;
+        cursor: pointer;
+        transition: transform 120ms ease, background 120ms ease;
+      }
+
+      button:hover {
+        background: var(--brand-strong);
+        transform: translateY(-1px);
+      }
+
+      button.secondary {
+        background: white;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .hint {
+        margin: 0;
+        color: var(--muted);
+        font: 500 12px/1.5 'Segoe UI', sans-serif;
+      }
+
+      .module-picker {
+        display: grid;
+        gap: 10px;
+      }
+
+      .module-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .module-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .module-card.is-disabled {
+        opacity: 0.58;
+      }
+
+      .module-meta {
+        display: grid;
+        gap: 4px;
+      }
+
+      .module-title {
+        font: 700 13px/1.35 'Segoe UI', sans-serif;
+      }
+
+      .module-copy {
+        color: var(--muted);
+        font: 500 12px/1.45 'Segoe UI', sans-serif;
+      }
+
+      .module-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font: 700 12px/1.2 'Segoe UI', sans-serif;
+      }
+
+      .module-check input {
+        width: auto;
+        margin: 0;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.72);
+        font: 700 12px/1.1 'Segoe UI', sans-serif;
+      }
+
+      label {
+        font: 700 13px/1.2 'Segoe UI', sans-serif;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 13px;
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+        font: 500 14px/1.4 'Segoe UI', sans-serif;
+      }
+
+      textarea {
+        min-height: 108px;
+        resize: vertical;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .result-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .status {
+        min-height: 22px;
+        color: var(--muted);
+        font: 600 13px/1.2 'Segoe UI', sans-serif;
+      }
+
+      pre {
+        margin: 0;
+        padding: 18px;
+        min-height: 500px;
+        overflow: auto;
+        border-radius: 18px;
+        background: #1d2528;
+        color: #eaf4f2;
+        font: 13px/1.55 Consolas, monospace;
+      }
+
+      .footer-note {
+        margin-top: 14px;
+        color: var(--muted);
+        font: 500 13px/1.5 'Segoe UI', sans-serif;
+      }
+
+      @media (max-width: 960px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .layout {
+          width: min(100% - 20px, 1180px);
+          padding-top: 20px;
+        }
+
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .module-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-inner {
+          padding: 16px;
+        }
+
+        pre {
+          min-height: 320px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="layout">
+      <section class="hero">
+        <span class="badge">Panel interactivo</span>
+        <h1>Prueba tu API desde una página real</h1>
+        <p class="subtitle">
+          Este panel consulta equipos, hallazgos y plantillas del backend que ya conectaste a PostgreSQL.
+          Si el servidor está levantado, abre esta misma URL desde otro equipo de tu red usando la IP local de tu PC.
+        </p>
+        <div class="tips">
+          <span class="tip" id="base-url-tip">Base URL: cargando...</span>
+          <span class="tip">Red local: usa tu IP y el puerto 3000</span>
+          <span class="tip">Salud API: /health</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="panel">
+          <div class="panel-inner">
+            <h2 class="section-title">Consultas rápidas</h2>
+            <p class="section-copy">Ejecuta lecturas comunes sin escribir código.</p>
+            <div class="endpoint-list">
+              <article class="endpoint">
+                <header>
+                  <span class="method">GET</span>
+                  <span class="route">/equipos</span>
+                </header>
+                <div class="actions">
+                  <button data-url="/equipos">Listar equipos</button>
+                  <button class="secondary" data-url="/equipos?q=compresor">Buscar compresor</button>
+                </div>
+              </article>
+
+              <article class="endpoint">
+                <header>
+                  <span class="method">GET</span>
+                  <span class="route">/hallazgos</span>
+                </header>
+                <div class="actions">
+                  <button data-url="/hallazgos">Listar hallazgos</button>
+                  <button class="secondary" data-url="/hallazgos?estado=ABIERTO">Solo abiertos</button>
+                </div>
+              </article>
+
+              <article class="endpoint">
+                <header>
+                  <span class="method">GET</span>
+                  <span class="route">/plantillas</span>
+                </header>
+                <div class="actions">
+                  <button data-url="/plantillas">Listar plantillas</button>
+                  <button class="secondary" data-url="/plantillas?modulo=electrico">Módulo eléctrico</button>
+                </div>
+              </article>
+
+              <article class="endpoint">
+                <header>
+                  <span class="method">GET</span>
+                  <span class="route">/informes</span>
+                </header>
+                <div class="actions">
+                  <button data-url="/informes">Listar informes</button>
+                </div>
+              </article>
+
+              <article class="endpoint">
+                <header>
+                  <span class="method">GET</span>
+                  <span class="route">/health</span>
+                </header>
+                <div class="actions">
+                  <button data-url="/health">Probar salud</button>
+                </div>
+              </article>
+            </div>
+
+            <div style="height: 22px"></div>
+
+            <h2 class="section-title">Crear hallazgo</h2>
+            <p class="section-copy">Envía un POST desde el navegador para validar escritura.</p>
+            <form id="create-form" class="form-grid">
+              <div class="split">
+                <div class="field">
+                  <label for="equipoId">Equipo ID</label>
+                  <input id="equipoId" name="equipoId" type="number" min="1" value="1" required />
+                </div>
+                <div class="field">
+                  <label for="tipoMantenimiento">Tipo mantenimiento</label>
+                  <input id="tipoMantenimiento" name="tipoMantenimiento" value="PREVENTIVO" required />
+                </div>
+              </div>
+
+              <div class="split">
+                <div class="field">
+                  <label for="modulo">Módulo</label>
+                  <input id="modulo" name="modulo" value="electrico" required />
+                </div>
+                <div class="field">
+                  <label for="cotizacion">Cotización</label>
+                  <select id="cotizacion" name="cotizacion">
+                    <option>NO</option>
+                    <option>SI</option>
+                    <option>NA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="descripcionHallazgo">Descripción</label>
+                <textarea id="descripcionHallazgo" name="descripcionHallazgo" required>Prueba desde la página web</textarea>
+              </div>
+
+              <div class="field">
+                <label for="observacion">Observación</label>
+                <textarea id="observacion" name="observacion">Creado desde el panel interactivo</textarea>
+              </div>
+
+              <div class="split">
+                <div class="field">
+                  <label for="estado">Estado</label>
+                  <select id="estado" name="estado">
+                    <option>ABIERTO</option>
+                    <option>PENDIENTE</option>
+                    <option>SOLUCIONADO</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="fechaHallazgo">Fecha hallazgo</label>
+                  <input id="fechaHallazgo" name="fechaHallazgo" type="date" required />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button type="submit">Enviar POST /hallazgos</button>
+              </div>
+            </form>
+
+            <div style="height: 22px"></div>
+
+            <h2 class="section-title">Actualizar hallazgo</h2>
+            <p class="section-copy">Envía un PATCH a un hallazgo existente.</p>
+            <form id="patch-form" class="form-grid">
+              <div class="split">
+                <div class="field">
+                  <label for="patchId">ID hallazgo</label>
+                  <input id="patchId" name="patchId" type="number" min="1" value="1" required />
+                </div>
+                <div class="field">
+                  <label for="patchEstado">Nuevo estado</label>
+                  <select id="patchEstado" name="estado">
+                    <option>ABIERTO</option>
+                    <option>PENDIENTE</option>
+                    <option selected>SOLUCIONADO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="fechaSolucion">Fecha solución</label>
+                <input id="fechaSolucion" name="fechaSolucion" type="date" />
+              </div>
+
+              <div class="actions">
+                <button type="submit">Enviar PATCH /hallazgos/:id</button>
+              </div>
+            </form>
+
+            <div style="height: 22px"></div>
+
+            <h2 class="section-title">Generar informe</h2>
+            <p class="section-copy">Selecciona hasta 3 módulos de la tabla <strong>plantillas</strong> y genera el informe base.</p>
+            <form id="informe-form" class="form-grid">
+              <div class="split">
+                <div class="field">
+                  <label for="informeEquipoId">Equipo ID</label>
+                  <input id="informeEquipoId" name="equipoId" type="number" min="1" value="1" required />
+                </div>
+                <div class="field">
+                  <label for="mantenimientoId">Mantenimiento ID</label>
+                  <input id="mantenimientoId" name="mantenimientoId" type="number" min="1" placeholder="Opcional" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Módulos disponibles</label>
+                <div class="pill-row">
+                  <span class="pill" id="module-counter">0 de 3 seleccionados</span>
+                  <span class="pill" id="module-status">Cargando plantillas...</span>
+                </div>
+              </div>
+
+              <div class="module-picker">
+                <div id="module-grid" class="module-grid"></div>
+                <p class="hint">Si no marcas observaciones manuales, el backend usará automáticamente la descripción guardada en la tabla plantillas.</p>
+              </div>
+
+              <div class="field">
+                <label for="informeObservaciones">Observaciones manuales</label>
+                <textarea id="informeObservaciones" name="observaciones" placeholder="Déjalo vacío para usar las plantillas seleccionadas."></textarea>
+              </div>
+
+              <div class="field">
+                <label for="informePendientes">Pendientes</label>
+                <textarea id="informePendientes" name="pendientes">Revisar hallazgos abiertos</textarea>
+              </div>
+
+              <div class="field">
+                <label for="informeRecomendaciones">Recomendaciones</label>
+                <textarea id="informeRecomendaciones" name="recomendaciones">Validacion desde panel interactivo</textarea>
+              </div>
+
+              <div class="actions">
+                <button type="submit">Enviar POST /informes</button>
+                <button type="button" class="secondary" id="preview-selected-modules">Ver módulos elegidos</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="result-head">
+              <div>
+                <h2 class="section-title">Resultado</h2>
+                <p class="section-copy">Respuesta formateada del endpoint ejecutado.</p>
+              </div>
+              <button class="secondary" id="clear-output">Limpiar</button>
+            </div>
+            <div class="status" id="status">Esperando una acción...</div>
+            <pre id="output">{ }</pre>
+            <p class="footer-note">
+              Si quieres abrir este panel desde otro dispositivo en tu red, usa <strong>http://IP-DE-TU-PC:3000</strong>.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const output = document.getElementById('output');
+      const statusNode = document.getElementById('status');
+      const baseUrlTip = document.getElementById('base-url-tip');
+      const createForm = document.getElementById('create-form');
+      const patchForm = document.getElementById('patch-form');
+      const informeForm = document.getElementById('informe-form');
+      const clearOutputButton = document.getElementById('clear-output');
+      const moduleGrid = document.getElementById('module-grid');
+      const moduleCounter = document.getElementById('module-counter');
+      const moduleStatus = document.getElementById('module-status');
+      const previewSelectedModulesButton = document.getElementById('preview-selected-modules');
+
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('fechaHallazgo').value = today;
+      document.getElementById('fechaSolucion').value = today;
+      baseUrlTip.textContent = `Base URL: ${window.location.origin}`;
+
+      function renderResponse(label, payload, ok = true) {
+        statusNode.textContent = label;
+        statusNode.style.color = ok ? '#0e7c66' : '#b2451b';
+        output.textContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+      }
+
+      function getSelectedModules() {
+        return Array.from(document.querySelectorAll('input[name="informesModulos"]:checked')).map(
+          (input) => input.value,
+        );
+      }
+
+      function updateModuleSelectionState() {
+        const selectedModules = getSelectedModules();
+        moduleCounter.textContent = `${selectedModules.length} de 3 seleccionados`;
+
+        document.querySelectorAll('input[name="informesModulos"]').forEach((input) => {
+          const card = input.closest('.module-card');
+          const shouldDisable = selectedModules.length >= 3 && !input.checked;
+          input.disabled = shouldDisable;
+
+          if (card) {
+            card.classList.toggle('is-disabled', shouldDisable);
+          }
+        });
+      }
+
+      function renderModules(plantillas) {
+        if (!Array.isArray(plantillas) || !plantillas.length) {
+          moduleGrid.innerHTML = '<p class="hint">No hay plantillas disponibles en este momento.</p>';
+          moduleStatus.textContent = 'Sin plantillas';
+          moduleCounter.textContent = '0 de 3 seleccionados';
+          return;
+        }
+
+        moduleStatus.textContent = `${plantillas.length} plantillas cargadas`;
+        moduleGrid.innerHTML = plantillas
+          .map(
+            (plantilla) => `
+              <label class="module-card">
+                <span class="module-check">
+                  <input type="checkbox" name="informesModulos" value="${plantilla.modulo}" />
+                  Usar este modulo
+                </span>
+                <span class="module-meta">
+                  <span class="module-title">${plantilla.modulo}</span>
+                  <span class="module-copy">${String(plantilla.observacionEstandar || '').slice(0, 180)}${String(plantilla.observacionEstandar || '').length > 180 ? '...' : ''}</span>
+                </span>
+              </label>
+            `,
+          )
+          .join('');
+
+        document.querySelectorAll('input[name="informesModulos"]').forEach((input) => {
+          input.addEventListener('change', updateModuleSelectionState);
+        });
+
+        updateModuleSelectionState();
+      }
+
+      async function loadModulesFromPlantillas() {
+        moduleStatus.textContent = 'Cargando plantillas...';
+
+        try {
+          const response = await fetch('/plantillas');
+          const payload = await response.json();
+          const plantillas = Array.isArray(payload) ? payload : payload.value;
+          renderModules(plantillas || []);
+        } catch (error) {
+          moduleGrid.innerHTML = '<p class="hint">No se pudieron cargar las plantillas desde la API.</p>';
+          moduleStatus.textContent = 'Error al cargar';
+          renderResponse('Error al cargar /plantillas', { message: error.message }, false);
+        }
+      }
+
+      async function requestJson(path, options = {}) {
+        renderResponse(`Consultando ${path}...`, { loading: true });
+        try {
+          const response = await fetch(path, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            ...options,
+          });
+
+          const contentType = response.headers.get('content-type') || '';
+          const payload = contentType.includes('application/json')
+            ? await response.json()
+            : await response.text();
+
+          renderResponse(`${response.status} ${response.statusText} · ${path}`, payload, response.ok);
+        } catch (error) {
+          renderResponse(`Error al consultar ${path}`, { message: error.message }, false);
+        }
+      }
+
+      document.querySelectorAll('button[data-url]').forEach((button) => {
+        button.addEventListener('click', () => requestJson(button.dataset.url));
+      });
+
+      clearOutputButton.addEventListener('click', () => {
+        renderResponse('Esperando una acción...', { });
+      });
+
+      previewSelectedModulesButton.addEventListener('click', () => {
+        const selectedModules = getSelectedModules();
+        renderResponse('Módulos seleccionados para /informes', {
+          count: selectedModules.length,
+          modulos: selectedModules,
+        });
+      });
+
+      createForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(createForm);
+        const payload = {
+          equipoId: Number(formData.get('equipoId')),
+          tipoMantenimiento: formData.get('tipoMantenimiento'),
+          modulo: formData.get('modulo'),
+          descripcionHallazgo: formData.get('descripcionHallazgo'),
+          cotizacion: formData.get('cotizacion'),
+          observacion: formData.get('observacion'),
+          estado: formData.get('estado'),
+          fechaHallazgo: formData.get('fechaHallazgo'),
+        };
+
+        await requestJson('/hallazgos', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      });
+
+      patchForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(patchForm);
+        const payload = {
+          estado: formData.get('estado'),
+          fechaSolucion: formData.get('fechaSolucion') || null,
+        };
+
+        const hallazgoId = Number(formData.get('patchId'));
+
+        await requestJson(`/hallazgos/${hallazgoId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+      });
+
+      informeForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const selectedModules = getSelectedModules();
+        if (!selectedModules.length) {
+          renderResponse('Selecciona al menos un módulo', {
+            message: 'Debes elegir entre 1 y 3 módulos desde plantillas.',
+          }, false);
+          return;
+        }
+
+        const formData = new FormData(informeForm);
+        const mantenimientoIdRaw = Number(formData.get('mantenimientoId'));
+
+        const payload = {
+          equipoId: Number(formData.get('equipoId')),
+          mantenimientoId: Number.isFinite(mantenimientoIdRaw) && mantenimientoIdRaw > 0 ? mantenimientoIdRaw : undefined,
+          modulos: selectedModules,
+          observaciones: String(formData.get('observaciones') || '').trim() || undefined,
+          pendientes: String(formData.get('pendientes') || '').trim() || undefined,
+          recomendaciones: String(formData.get('recomendaciones') || '').trim() || undefined,
+        };
+
+        await requestJson('/informes', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      });
+
+      loadModulesFromPlantillas();
+    </script>
+  </body>
+</html>
