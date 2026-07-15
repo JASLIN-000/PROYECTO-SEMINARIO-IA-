@@ -6,8 +6,13 @@ export class HallazgosController {
   constructor(private readonly hallazgosService: HallazgosService) {}
 
   @Get()
-  findAll(@Query('equipoId') equipoId?: string, @Query('estado') estado?: string) {
-    return this.hallazgosService.findAll(equipoId, estado);
+  findAll(
+    @Query('equipoId') equipoId?: string,
+    @Query('estado') estado?: string,
+    @Query('modulo') modulo?: string,
+    @Query('codigoEquipo') codigoEquipo?: string,
+  ) {
+    return this.hallazgosService.findAll(equipoId, estado, modulo, codigoEquipo);
   }
 
   @Post()

@@ -9,6 +9,7 @@ BEGIN;
 -- Si ya eliminaste tablas manualmente, estos DROP no fallan.
 -- Si aun existen, las elimina para reconstruir todo limpio.
 DROP TABLE IF EXISTS informes CASCADE;
+DROP TABLE IF EXISTS tecnicos_acceso CASCADE;
 DROP TABLE IF EXISTS hallazgos CASCADE;
 DROP TABLE IF EXISTS plantillas CASCADE;
 DROP TABLE IF EXISTS equipos CASCADE;
@@ -109,6 +110,18 @@ CREATE TABLE equipos (
   nombre_equipo VARCHAR(150) NOT NULL,
   acuerdo_nivel_servicio_dh SMALLINT NOT NULL CHECK (acuerdo_nivel_servicio_dh > 0),
   estado VARCHAR(10) NOT NULL CHECK (estado IN ('ACTIVO', 'INACTIVO')),
+  ruta_numero VARCHAR(20),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE tecnicos_acceso (
+  id BIGSERIAL PRIMARY KEY,
+  cedula VARCHAR(30) NOT NULL UNIQUE,
+  nombre VARCHAR(120) NOT NULL,
+  ruta_numero VARCHAR(20) NOT NULL,
+  password_hash VARCHAR(64) NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -164,15 +177,23 @@ CREATE TABLE informes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_equipos_estado ON equipos(estado);
+CREATE INDEX IF NOT EXISTS idx_equipos_ruta_numero ON equipos(ruta_numero);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_equipo_id ON hallazgos(equipo_id);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_estado ON hallazgos(estado);
 CREATE INDEX IF NOT EXISTS idx_hallazgos_modulo ON hallazgos(modulo);
 CREATE INDEX IF NOT EXISTS idx_informes_equipo_id ON informes(equipo_id);
 CREATE INDEX IF NOT EXISTS idx_informes_fecha_generacion ON informes(fecha_generacion DESC);
+CREATE INDEX IF NOT EXISTS idx_tecnicos_acceso_ruta_numero ON tecnicos_acceso(ruta_numero);
 
 DROP TRIGGER IF EXISTS trg_equipos_updated_at ON equipos;
 CREATE TRIGGER trg_equipos_updated_at
 BEFORE UPDATE ON equipos
+FOR EACH ROW
+EXECUTE FUNCTION fn_set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tecnicos_acceso_updated_at ON tecnicos_acceso;
+CREATE TRIGGER trg_tecnicos_acceso_updated_at
+BEFORE UPDATE ON tecnicos_acceso
 FOR EACH ROW
 EXECUTE FUNCTION fn_set_updated_at();
 

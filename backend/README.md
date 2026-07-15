@@ -42,6 +42,11 @@ npm run start:dev
 
 Si la conexion es correcta, NestJS quedara escuchando por defecto en `http://localhost:3000`.
 
+### Calendario de dias habiles
+
+El backend calcula los dias habiles con el calendario nacional de Colombia por defecto (`HOLIDAYS_COUNTRY=CO`) y excluye sabados y domingos.
+Si necesitas añadir o reemplazar feriados manualmente, define `HOLIDAYS` con fechas ISO separadas por coma.
+
 ## Probar endpoints
 
 Pruebas rapidas desde el navegador o Postman:

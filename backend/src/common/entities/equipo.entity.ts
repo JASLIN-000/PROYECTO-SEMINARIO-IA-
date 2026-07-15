@@ -16,4 +16,7 @@ export class Equipo {
 
   @Column()
   estado!: string;
+
+  @Column({ name: 'ruta_numero', type: 'varchar', length: 20, nullable: true })
+  rutaNumero?: string;
 }

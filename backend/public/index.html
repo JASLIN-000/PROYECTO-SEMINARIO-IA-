@@ -44,6 +44,13 @@
         margin-bottom: 24px;
       }
 
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 18px;
+        align-items: start;
+      }
+
       .badge {
         width: fit-content;
         padding: 8px 12px;
@@ -101,6 +108,10 @@
 
       .panel-inner {
         padding: 20px;
+      }
+
+      .login-panel {
+        background: rgba(255, 247, 235, 0.92);
       }
 
       .section-title {
@@ -190,6 +201,85 @@
       .field {
         display: grid;
         gap: 6px;
+      }
+
+      .route-equipos {
+        display: grid;
+        gap: 10px;
+      }
+
+      .route-equipo-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .route-equipo-code {
+        font: 700 13px/1.4 'Segoe UI', sans-serif;
+        color: var(--brand-strong);
+      }
+
+      .route-equipo-name {
+        font: 600 13px/1.4 'Segoe UI', sans-serif;
+        color: var(--ink);
+      }
+
+      .route-equipo-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: var(--muted);
+        font: 500 12px/1.4 'Segoe UI', sans-serif;
+      }
+
+      .selected-equipo {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border: 1px dashed var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.52);
+      }
+
+      .hallazgos-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .hallazgo-card {
+        display: grid;
+        gap: 6px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .hallazgo-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .hallazgo-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .hallazgo-tag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(14, 124, 102, 0.1);
+        color: var(--brand-strong);
+        font: 700 12px/1 'Segoe UI', sans-serif;
       }
 
       .hint {
@@ -323,6 +413,7 @@
       }
 
       @media (max-width: 960px) {
+        .hero-grid,
         .grid {
           grid-template-columns: 1fr;
         }
@@ -355,16 +446,49 @@
   <body>
     <main class="layout">
       <section class="hero">
-        <span class="badge">Panel interactivo</span>
-        <h1>Prueba tu API desde una página real</h1>
-        <p class="subtitle">
-          Este panel consulta equipos, hallazgos y plantillas del backend que ya conectaste a PostgreSQL.
-          Si el servidor está levantado, abre esta misma URL desde otro equipo de tu red usando la IP local de tu PC.
-        </p>
-        <div class="tips">
-          <span class="tip" id="base-url-tip">Base URL: cargando...</span>
-          <span class="tip">Red local: usa tu IP y el puerto 3000</span>
-          <span class="tip">Salud API: /health</span>
+        <div class="hero-grid">
+          <div>
+            <span class="badge">Panel interactivo</span>
+            <h1>Login técnico y acceso a su ruta</h1>
+            <p class="subtitle">
+              El técnico entra con su cédula, número de ruta y contraseña. Si la ruta ya está asignada en equipos, verá directamente sus equipos. Si aún no hay rutas cargadas, el sistema muestra una vista general temporal.
+            </p>
+            <div class="tips">
+              <span class="tip" id="base-url-tip">Base URL: cargando...</span>
+              <span class="tip">Red local: usa tu IP y el puerto 3000</span>
+              <span class="tip">Salud API: /health</span>
+            </div>
+          </div>
+
+          <div class="panel login-panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Entrar al sistema</h2>
+              <p class="section-copy">Acceso técnico mínimo para el MVP. Si no has cargado técnicos aún, se crea un acceso demo automático.</p>
+              <form id="login-form" class="form-grid">
+                <div class="field">
+                  <label for="cedulaLogin">Usuario / Cédula</label>
+                  <input id="cedulaLogin" name="cedula" value="10101010" required />
+                </div>
+                <div class="field">
+                  <label for="rutaLogin">Número de ruta</label>
+                  <input id="rutaLogin" name="rutaNumero" value="15" placeholder="Ej: 15" required />
+                </div>
+                <div class="field">
+                  <label for="passwordLogin">Contraseña</label>
+                  <input id="passwordLogin" name="password" type="password" value="123456" required />
+                </div>
+                <div class="actions">
+                  <button type="submit">Ingresar</button>
+                </div>
+              </form>
+              <div style="height: 18px"></div>
+              <div class="status" id="login-status">Esperando login...</div>
+              <div class="actions" id="route-actions" style="display: none; margin-top: 12px;">
+                <button type="button" id="load-route-equipos">Consultar equipos de la ruta</button>
+              </div>
+              <div id="route-equipos" class="route-equipos" style="display: none;"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -430,21 +554,61 @@
 
             <div style="height: 22px"></div>
 
+            <h2 class="section-title">Equipo a intervenir</h2>
+            <p class="section-copy">Selecciona un equipo de la ruta y carga sus hallazgos de los últimos 5 meses antes de editar.</p>
+            <div class="selected-equipo">
+              <strong id="selected-equipo-name">Aún no has seleccionado un equipo.</strong>
+              <span id="selected-equipo-code">ID equipo: -</span>
+              <span id="selected-equipo-route">Ruta: -</span>
+              <div class="field">
+                <label for="equipoSelector">Seleccionar ID equipo a intervenir</label>
+                <select id="equipoSelector" name="equipoSelector">
+                  <option value="">Primero inicia sesión y luego selecciona un equipo</option>
+                </select>
+              </div>
+              <div class="split">
+                <div class="field">
+                  <label for="hallazgoEstadoFiltro">Filtrar por estado</label>
+                  <select id="hallazgoEstadoFiltro" name="hallazgoEstadoFiltro">
+                    <option value="">Todos</option>
+                    <option value="ABIERTO">ABIERTO</option>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="SOLUCIONADO">SOLUCIONADO</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="hallazgoModuloFiltro">Filtrar por módulo</label>
+                  <input id="hallazgoModuloFiltro" name="hallazgoModuloFiltro" placeholder="Ej: control" />
+                </div>
+              </div>
+              <div class="actions">
+                <button type="button" id="load-selected-hallazgos">Cargar hallazgos últimos 5 meses</button>
+                <button type="button" class="secondary" id="new-hallazgo-from-equipo">Agregar nuevo hallazgo</button>
+              </div>
+              <div id="hallazgos-list" class="hallazgos-list"></div>
+            </div>
+
+            <div style="height: 22px"></div>
+
             <h2 class="section-title">Crear hallazgo</h2>
             <p class="section-copy">Envía un POST desde el navegador para validar escritura.</p>
             <form id="create-form" class="form-grid">
               <div class="split">
                 <div class="field">
-                  <label for="equipoId">Equipo ID</label>
+                  <label for="equipoId">Equipo interno</label>
                   <input id="equipoId" name="equipoId" type="number" min="1" value="1" required />
                 </div>
                 <div class="field">
-                  <label for="tipoMantenimiento">Tipo mantenimiento</label>
-                  <input id="tipoMantenimiento" name="tipoMantenimiento" value="PREVENTIVO" required />
+                  <label for="equipoCodigoHallazgo">ID equipo visible</label>
+                  <input id="equipoCodigoHallazgo" name="equipoCodigoHallazgo" value="-" readonly />
                 </div>
               </div>
 
               <div class="split">
+                <div class="field">
+                  <label for="tipoMantenimiento">Tipo mantenimiento</label>
+                  <input id="tipoMantenimiento" name="tipoMantenimiento" value="PREVENTIVO" required />
+                </div>
                 <div class="field">
                   <label for="modulo">Módulo</label>
                   <input id="modulo" name="modulo" value="electrico" required />
@@ -507,6 +671,14 @@
                     <option selected>SOLUCIONADO</option>
                   </select>
                 </div>
+              </div>
+
+              <div class="field">
+                <label for="patchMethod">Método de actualización</label>
+                <select id="patchMethod" name="patchMethod">
+                  <option value="PATCH">PATCH</option>
+                  <option value="PUT">PUT</option>
+                </select>
               </div>
 
               <div class="field">
@@ -597,11 +769,28 @@
       const createForm = document.getElementById('create-form');
       const patchForm = document.getElementById('patch-form');
       const informeForm = document.getElementById('informe-form');
+      const loginForm = document.getElementById('login-form');
       const clearOutputButton = document.getElementById('clear-output');
       const moduleGrid = document.getElementById('module-grid');
       const moduleCounter = document.getElementById('module-counter');
       const moduleStatus = document.getElementById('module-status');
       const previewSelectedModulesButton = document.getElementById('preview-selected-modules');
+      const loginStatus = document.getElementById('login-status');
+      const routeActions = document.getElementById('route-actions');
+      const routeEquipos = document.getElementById('route-equipos');
+      const loadRouteEquiposButton = document.getElementById('load-route-equipos');
+      const equipoSelector = document.getElementById('equipoSelector');
+      const selectedEquipoName = document.getElementById('selected-equipo-name');
+      const selectedEquipoCode = document.getElementById('selected-equipo-code');
+      const selectedEquipoRoute = document.getElementById('selected-equipo-route');
+      const hallazgoEstadoFiltro = document.getElementById('hallazgoEstadoFiltro');
+      const hallazgoModuloFiltro = document.getElementById('hallazgoModuloFiltro');
+      const loadSelectedHallazgosButton = document.getElementById('load-selected-hallazgos');
+      const newHallazgoFromEquipoButton = document.getElementById('new-hallazgo-from-equipo');
+      const hallazgosList = document.getElementById('hallazgos-list');
+
+      let currentEquipo = null;
+      let pendingRoutePayload = null;
 
       const today = new Date().toISOString().slice(0, 10);
       document.getElementById('fechaHallazgo').value = today;
@@ -612,6 +801,165 @@
         statusNode.textContent = label;
         statusNode.style.color = ok ? '#0e7c66' : '#b2451b';
         output.textContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+      }
+
+      function renderRouteEquipos(payload) {
+        const equipos = Array.isArray(payload.equipos) ? payload.equipos : [];
+        const calendario = payload.calendario || {};
+        const dayLabel = calendario.isBusinessDay && calendario.businessDayIndex > 0
+          ? `Día hábil ${calendario.businessDayIndex} del mes`
+          : 'Hoy no es día hábil';
+        routeEquipos.style.display = 'block';
+
+        equipoSelector.innerHTML = equipos.length
+          ? '<option value="">Selecciona un ID equipo</option>' + equipos
+              .map(
+                (equipo) =>
+                  `<option value="${equipo.id}">${equipo.idEquipo} · ${equipo.nombreEquipo}</option>`,
+              )
+              .join('')
+          : '<option value="">No hay equipos programados para este día hábil</option>';
+
+        if (!equipos.length) {
+          routeEquipos.innerHTML = `<p class="hint">${dayLabel}. No hay equipos asignados para intervenir hoy con este calendario.</p>`;
+          return;
+        }
+
+        routeEquipos.innerHTML = `<p class="hint">${dayLabel}. Se muestran solo los equipos que coinciden con el acuerdo de servicio de hoy.</p>` + equipos
+          .map(
+            (equipo) => `
+              <article class="route-equipo-card">
+                <strong class="route-equipo-code">${equipo.idEquipo}</strong>
+                <span class="route-equipo-name">${equipo.nombreEquipo}</span>
+                <div class="route-equipo-meta">
+                  <span>Ruta: ${equipo.rutaNumero || payload.tecnico?.rutaNumero || '-'}</span>
+                  <span>Estado: ${equipo.estado}</span>
+                  <span>SLA: ${equipo.acuerdoNivelServicioDh}DH</span>
+                </div>
+                <div class="actions">
+                  <button type="button" class="secondary select-equipo-button" data-equipo-id="${equipo.id}" data-equipo-codigo="${equipo.idEquipo}" data-equipo-nombre="${equipo.nombreEquipo}" data-equipo-ruta="${equipo.rutaNumero || payload.tecnico?.rutaNumero || ''}">Seleccionar este equipo</button>
+                </div>
+              </article>
+            `,
+          )
+          .join('');
+
+        routeEquipos.querySelectorAll('.select-equipo-button').forEach((button) => {
+          button.addEventListener('click', () => {
+            selectEquipo({
+              id: Number(button.dataset.equipoId),
+              idEquipo: button.dataset.equipoCodigo,
+              nombreEquipo: button.dataset.equipoNombre,
+              rutaNumero: button.dataset.equipoRuta,
+            });
+          });
+        });
+
+        equipoSelector.onchange = () => {
+          const equipo = equipos.find((item) => item.id === Number(equipoSelector.value));
+          if (equipo) {
+            selectEquipo(equipo);
+            loadSelectedHallazgos();
+          }
+        };
+
+        if (!currentEquipo && equipos.length) {
+          equipoSelector.value = String(equipos[0].id);
+          selectEquipo(equipos[0]);
+        }
+
+        routeActions.style.display = 'none';
+      }
+
+      function selectEquipo(equipo) {
+        currentEquipo = equipo;
+        selectedEquipoName.textContent = equipo.nombreEquipo;
+        selectedEquipoCode.textContent = `ID equipo visible: ${equipo.idEquipo}`;
+        selectedEquipoRoute.textContent = `Ruta: ${equipo.rutaNumero || '-'}`;
+
+        document.getElementById('equipoId').value = equipo.id;
+        document.getElementById('equipoCodigoHallazgo').value = equipo.idEquipo;
+        document.getElementById('informeEquipoId').value = equipo.id;
+        equipoSelector.value = String(equipo.id);
+        document.getElementById('create-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function renderHallazgos(hallazgos) {
+        if (!Array.isArray(hallazgos) || !hallazgos.length) {
+          hallazgosList.innerHTML = '<p class="hint">Equipo sin hallazgos en los últimos 5 meses con los filtros actuales.</p>';
+          return;
+        }
+
+        hallazgosList.innerHTML = hallazgos
+          .map(
+            (hallazgo) => `
+              <article class="hallazgo-card">
+                <div class="hallazgo-card-header">
+                  <strong>Hallazgo #${hallazgo.id}</strong>
+                  <div class="hallazgo-meta">
+                    <span class="hallazgo-tag">${hallazgo.estado}</span>
+                    <span class="hallazgo-tag">${hallazgo.modulo}</span>
+                    <span class="hallazgo-tag">${hallazgo.fechaHallazgo}</span>
+                  </div>
+                </div>
+                <div>${hallazgo.descripcionHallazgo}</div>
+                <div class="hint">Observación: ${hallazgo.observacion || 'Sin observación'}</div>
+                <div class="actions">
+                  <button type="button" class="secondary edit-hallazgo-button" data-hallazgo-id="${hallazgo.id}" data-hallazgo-estado="${hallazgo.estado}" data-hallazgo-fecha-solucion="${hallazgo.fechaSolucion || ''}">Editar este hallazgo</button>
+                </div>
+              </article>
+            `,
+          )
+          .join('');
+
+        hallazgosList.querySelectorAll('.edit-hallazgo-button').forEach((button) => {
+          button.addEventListener('click', () => {
+            document.getElementById('patchId').value = button.dataset.hallazgoId;
+            document.getElementById('patchEstado').value = button.dataset.hallazgoEstado;
+            document.getElementById('fechaSolucion').value = button.dataset.hallazgoFechaSolucion;
+            renderResponse('Hallazgo cargado para edición', {
+              id: Number(button.dataset.hallazgoId),
+              estado: button.dataset.hallazgoEstado,
+              fechaSolucion: button.dataset.hallazgoFechaSolucion || null,
+            });
+          });
+        });
+      }
+
+      async function loadSelectedHallazgos() {
+        if (!currentEquipo) {
+          renderResponse('Selecciona un equipo primero', {
+            message: 'Debes seleccionar un equipo a intervenir antes de consultar hallazgos.',
+          }, false);
+          return;
+        }
+
+        selectedEquipoCode.textContent = `ID equipo visible: ${currentEquipo.idEquipo}`;
+
+        const params = new URLSearchParams({
+          codigoEquipo: currentEquipo.idEquipo,
+        });
+
+        if (hallazgoEstadoFiltro.value) {
+          params.set('estado', hallazgoEstadoFiltro.value);
+        }
+
+        if (hallazgoModuloFiltro.value.trim()) {
+          params.set('modulo', hallazgoModuloFiltro.value.trim());
+        }
+
+        const path = `/hallazgos?${params.toString()}`;
+        renderResponse(`Consultando ${path}...`, { loading: true });
+
+        try {
+          const response = await fetch(path);
+          const payload = await response.json();
+          renderHallazgos(payload);
+          renderResponse(`${response.status} ${response.statusText} · ${path}`, payload, response.ok);
+        } catch (error) {
+          hallazgosList.innerHTML = '';
+          renderResponse(`Error al consultar ${path}`, { message: error.message }, false);
+        }
       }
 
       function getSelectedModules() {
@@ -712,6 +1060,81 @@
         renderResponse('Esperando una acción...', { });
       });
 
+      loadSelectedHallazgosButton.addEventListener('click', loadSelectedHallazgos);
+
+      loadRouteEquiposButton.addEventListener('click', () => {
+        if (!pendingRoutePayload) {
+          renderResponse('Primero inicia sesión', {
+            message: 'Debes iniciar sesión antes de consultar los equipos de la ruta.',
+          }, false);
+          return;
+        }
+
+        renderRouteEquipos(pendingRoutePayload);
+        renderResponse('Equipos de la ruta cargados', pendingRoutePayload);
+      });
+
+      newHallazgoFromEquipoButton.addEventListener('click', () => {
+        if (!currentEquipo) {
+          renderResponse('Selecciona un equipo primero', {
+            message: 'Debes seleccionar un equipo antes de crear un nuevo hallazgo.',
+          }, false);
+          return;
+        }
+
+        document.getElementById('equipoId').value = currentEquipo.id;
+        document.getElementById('equipoCodigoHallazgo').value = currentEquipo.idEquipo;
+        document.getElementById('descripcionHallazgo').focus();
+        document.getElementById('create-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        renderResponse('Equipo listo para nuevo hallazgo', {
+          id: currentEquipo.id,
+          idEquipo: currentEquipo.idEquipo,
+          nombreEquipo: currentEquipo.nombreEquipo,
+        });
+      });
+
+      loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(loginForm);
+        const payload = {
+          cedula: String(formData.get('cedula') || '').trim(),
+          rutaNumero: String(formData.get('rutaNumero') || '').trim(),
+          password: String(formData.get('password') || ''),
+        };
+
+        loginStatus.textContent = 'Validando acceso...';
+        loginStatus.style.color = '#5b6a70';
+
+        try {
+          const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json();
+
+          if (!response.ok) {
+            throw new Error(body.message || 'No fue posible iniciar sesion');
+          }
+
+          loginStatus.textContent = `${body.tecnico.nombre} · ${body.mensaje}`;
+          loginStatus.style.color = '#0e7c66';
+          pendingRoutePayload = body;
+          routeActions.style.display = 'flex';
+          routeEquipos.style.display = 'none';
+          routeEquipos.innerHTML = '<p class="hint">Pulsa “Consultar equipos de la ruta” para ver la lista.</p>';
+          renderResponse('Login correcto', body);
+        } catch (error) {
+          loginStatus.textContent = error.message;
+          loginStatus.style.color = '#b2451b';
+          routeEquipos.innerHTML = '';
+          routeEquipos.style.display = 'none';
+          routeActions.style.display = 'none';
+          pendingRoutePayload = null;
+          renderResponse('Error en /auth/login', { message: error.message }, false);
+        }
+      });
+
       previewSelectedModulesButton.addEventListener('click', () => {
         const selectedModules = getSelectedModules();
         renderResponse('Módulos seleccionados para /informes', {
@@ -749,11 +1172,16 @@
         };
 
         const hallazgoId = Number(formData.get('patchId'));
+        const method = String(formData.get('patchMethod') || 'PATCH');
 
         await requestJson(`/hallazgos/${hallazgoId}`, {
-          method: 'PATCH',
+          method,
           body: JSON.stringify(payload),
         });
+
+        if (currentEquipo) {
+          await loadSelectedHallazgos();
+        }
       });
 
       informeForm.addEventListener('submit', async (event) => {

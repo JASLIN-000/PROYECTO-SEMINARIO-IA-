@@ -6,10 +6,12 @@ import { EquiposModule } from './equipos/equipos.module';
 import { HallazgosModule } from './hallazgos/hallazgos.module';
 import { InformesModule } from './informes/informes.module';
 import { PlantillasModule } from './plantillas/plantillas.module';
+import { AuthModule } from './auth/auth.module';
 import { Equipo } from './common/entities/equipo.entity';
 import { Hallazgo } from './common/entities/hallazgo.entity';
 import { Plantilla } from './common/entities/plantilla.entity';
 import { Informe } from './common/entities/informe.entity';
+import { TecnicoAcceso } from './common/entities/tecnico-acceso.entity';
 
 @Module({
   imports: [
@@ -20,11 +22,12 @@ import { Informe } from './common/entities/informe.entity';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'raul123',
       database: process.env.DB_NAME || 'mantenimiento',
-      entities: [Equipo, Hallazgo, Plantilla, Informe],
+      entities: [Equipo, Hallazgo, Plantilla, Informe, TecnicoAcceso],
       synchronize: false,
       autoLoadEntities: true,
       logging: false,
     }),
+    AuthModule,
     EquiposModule,
     HallazgosModule,
     InformesModule,

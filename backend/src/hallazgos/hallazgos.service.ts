@@ -1,26 +1,41 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Equipo } from '../common/entities/equipo.entity';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import {
+  getConfiguredHolidaySet,
   moveToNextBusinessDay,
-  parseHolidaySet,
   toIsoDate,
 } from '../common/utils/business-days';
 
 @Injectable()
 export class HallazgosService {
-  private readonly holidays = parseHolidaySet(process.env.HOLIDAYS);
+  private readonly holidays = getConfiguredHolidaySet();
   private readonly hallazgosFallback: Array<any> = [];
 
   constructor(
     @InjectRepository(Hallazgo)
     private readonly hallazgosRepository: Repository<Hallazgo>,
+    @InjectRepository(Equipo)
+    private readonly equiposRepository: Repository<Equipo>,
   ) {}
 
-  async findAll(equipoId?: string, estado?: string) {
+  async findAll(equipoId?: string, estado?: string, modulo?: string, codigoEquipo?: string) {
+    const fechaDesde = this.getFiveMonthsAgoIsoDate();
+
     try {
-      const query = this.hallazgosRepository.createQueryBuilder('hallazgo');
+      const query = this.hallazgosRepository
+        .createQueryBuilder('hallazgo')
+        .where('hallazgo.fechaHallazgo >= :fechaDesde', { fechaDesde });
+
+      if (codigoEquipo?.trim()) {
+        query
+          .innerJoin(Equipo, 'equipo', 'equipo.id = hallazgo.equipoId')
+          .andWhere('LOWER(equipo.idEquipo) = :codigoEquipo', {
+            codigoEquipo: codigoEquipo.trim().toLowerCase(),
+          });
+      }
 
       if (equipoId) {
         query.andWhere('hallazgo.equipoId = :equipoId', { equipoId: Number(equipoId) });
@@ -32,13 +47,30 @@ export class HallazgosService {
         });
       }
 
-      return await query.getMany();
+      if (modulo?.trim()) {
+        query.andWhere('LOWER(hallazgo.modulo) = :modulo', {
+          modulo: modulo.trim().toLowerCase(),
+        });
+      }
+
+      return await query.orderBy('hallazgo.fechaHallazgo', 'DESC').addOrderBy('hallazgo.id', 'DESC').getMany();
     } catch {
+      let fallbackEquipoId = equipoId ? Number(equipoId) : undefined;
+
+      if (!fallbackEquipoId && codigoEquipo?.trim()) {
+        const equipo = await this.equiposRepository.findOne({
+          where: { idEquipo: codigoEquipo.trim() },
+        }).catch(() => null);
+        fallbackEquipoId = equipo?.id;
+      }
+
       return this.hallazgosFallback.filter((item) => {
-        const byEquipo = equipoId ? item.equipoId === Number(equipoId) : true;
+        const byEquipo = fallbackEquipoId ? item.equipoId === fallbackEquipoId : true;
         const byEstado = estado ? String(item.estado).toLowerCase() === estado.toLowerCase() : true;
-        return byEquipo && byEstado;
-      });
+        const byModulo = modulo ? String(item.modulo).toLowerCase() === modulo.toLowerCase() : true;
+        const byFecha = !item.fechaHallazgo || String(item.fechaHallazgo) >= fechaDesde;
+        return byEquipo && byEstado && byModulo && byFecha;
+      }).sort((a, b) => String(b.fechaHallazgo ?? '').localeCompare(String(a.fechaHallazgo ?? '')));
     }
   }
 
@@ -148,5 +180,11 @@ export class HallazgosService {
     }
 
     return normalized;
+  }
+
+  private getFiveMonthsAgoIsoDate() {
+    const date = new Date();
+    date.setUTCMonth(date.getUTCMonth() - 5);
+    return toIsoDate(date);
   }
 }
