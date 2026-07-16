@@ -1,0 +1,16 @@
+﻿{
+    "timeMs":  41,
+    "status":  null,
+    "url":  "http://localhost:3000/equipos?fecha=2026-07-11",
+    "body":  {
+                 "calendario":  {
+                                    "dateIso":  "2026-07-10",
+                                    "businessDayIndex":  8,
+                                    "isBusinessDay":  true,
+                                    "monthStartIso":  "2026-07-01"
+                                },
+                 "equipos":  [
+
+                             ]
+             }
+}

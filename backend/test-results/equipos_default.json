@@ -1,0 +1,27 @@
+﻿{
+    "timeMs":  2335,
+    "status":  null,
+    "url":  "http://localhost:3000/equipos",
+    "body":  {
+                 "calendario":  {
+                                    "dateIso":  "2026-07-15",
+                                    "businessDayIndex":  10,
+                                    "isBusinessDay":  true,
+                                    "monthStartIso":  "2026-07-01"
+                                },
+                 "equipos":  [
+                                 {
+                                     "id":  6,
+                                     "idEquipo":  "TEST-EQ-01",
+                                     "nombreEquipo":  "Equipo de prueba",
+                                     "acuerdoNivelServicioDh":  10,
+                                     "estado":  "ACTIVO",
+                                     "rutaNumero":  "R-12",
+                                     "slaDiasHabiles":  10,
+                                     "slaHoras":  240,
+                                     "nombre":  "Equipo de prueba",
+                                     "acuerdoNivelServicio":  "10DH"
+                                 }
+                             ]
+             }
+}

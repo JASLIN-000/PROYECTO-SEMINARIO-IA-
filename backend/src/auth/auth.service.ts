@@ -33,10 +33,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
-    const expectedHash = Buffer.from(tecnico.passwordHash, 'hex');
-    const receivedHash = Buffer.from(this.hashPassword(body.password), 'hex');
-
-    if (expectedHash.length !== receivedHash.length || !timingSafeEqual(expectedHash, receivedHash)) {
+    if (!this.passwordsMatch(body.password, tecnico.passwordHash)) {
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
@@ -169,6 +166,20 @@ export class AuthService {
     }
 
     await this.schemaReady;
+  }
+
+  private passwordsMatch(password: string, storedHash: string) {
+    const rawPassword = String(password);
+
+    if (/^[0-9a-fA-F]{64}$/.test(storedHash)) {
+      const expectedHash = Buffer.from(storedHash, 'hex');
+      const receivedHash = Buffer.from(this.hashPassword(rawPassword), 'hex');
+      if (expectedHash.length === receivedHash.length && timingSafeEqual(expectedHash, receivedHash)) {
+        return true;
+      }
+    }
+
+    return storedHash === rawPassword;
   }
 
   private hashPassword(password: string) {

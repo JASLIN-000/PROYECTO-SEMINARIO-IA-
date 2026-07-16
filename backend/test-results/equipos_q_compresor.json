@@ -1,0 +1,16 @@
+﻿{
+    "timeMs":  46,
+    "status":  null,
+    "url":  "http://localhost:3000/equipos?q=compresor",
+    "body":  {
+                 "calendario":  {
+                                    "dateIso":  "2026-07-15",
+                                    "businessDayIndex":  10,
+                                    "isBusinessDay":  true,
+                                    "monthStartIso":  "2026-07-01"
+                                },
+                 "equipos":  [
+
+                             ]
+             }
+}

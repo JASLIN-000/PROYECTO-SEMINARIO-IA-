@@ -1,0 +1,6 @@
+﻿{
+    "timeMs":  0,
+    "status":  "SKIP",
+    "url":  "http://localhost:3000/hallazgos?codigoEquipo=SKIP",
+    "body":  "No idEquipo available from /equipos"
+}
