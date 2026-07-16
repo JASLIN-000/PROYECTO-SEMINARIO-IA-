@@ -443,14 +443,13 @@
             <section class="panel">
               <h3>Consulta de Equipos (SPEC2)</h3>
               <div class="grid-2">
-                <input id="eqQuery" type="text" placeholder="Buscar por ID o nombre" />
                 <input id="eqRuta" type="text" placeholder="Ruta (ej: 15)" />
+                <input id="eqFecha" type="date" />
               </div>
               <div class="grid-2">
-                <input id="eqFecha" type="date" />
+                <button id="btnEquiposBuscar" class="ghost" type="button">Consultar equipos</button>
                 <button id="btnEquiposHoy" class="ghost" type="button">Hoy habil</button>
               </div>
-              <button id="btnEquiposBuscar" class="ghost" type="button">Consultar equipos</button>
               <div id="equiposStatus" class="status" role="status" aria-live="polite"></div>
               <div id="equiposCalendario" class="calendar">Calendario pendiente de consulta.</div>
               <div id="listaEquipos" class="list"></div>
@@ -497,7 +496,6 @@
       const cObservacion = document.getElementById('cObservacion');
       const btnCrear = document.getElementById('btnCrear');
       const btnLimpiarCrear = document.getElementById('btnLimpiarCrear');
-      const eqQuery = document.getElementById('eqQuery');
       const eqRuta = document.getElementById('eqRuta');
       const eqFecha = document.getElementById('eqFecha');
       const btnEquiposHoy = document.getElementById('btnEquiposHoy');
@@ -530,7 +528,7 @@
             return `
               <article class="item">
                 <div class="item-head">
-                  <strong>${equipo.idEquipo} · ${equipo.nombreEquipo}</strong>
+                  <strong><button class="small-btn" data-action="equipo-hallazgos" data-equipo-id="${equipo.idEquipo}">${equipo.idEquipo}</button> · ${equipo.nombreEquipo}</strong>
                   <span class="badge pendiente">Ruta ${equipo.rutaNumero ?? '-'}</span>
                 </div>
                 <div class="meta">SLA: ${equipo.acuerdoNivelServicioDh ?? '-'} dia(s) habiles | Estado: ${equipo.estado ?? '-'}</div>
@@ -539,6 +537,23 @@
           })
           .join('');
 
+        listaEquipos.querySelectorAll('[data-action="equipo-hallazgos"]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const equipoId = String(btn.dataset.equipoId || '').trim();
+            if (!equipoId) {
+              return;
+            }
+
+            fEquipoId.value = equipoId;
+            fNombreEquipo.value = '';
+            fEstado.value = '';
+            fModulo.value = '';
+            setStatus(crudStatus, `Consultando hallazgos para equipo ${equipoId}...`, '');
+            await consultarHallazgos();
+            listaHallazgos.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+
         setStatus(equiposStatus, `${mensaje} (${equipos.length} equipo(s)).`, 'ok');
       }
 
@@ -546,13 +561,9 @@
         setStatus(equiposStatus, 'Consultando equipos...', '');
         try {
           const params = new URLSearchParams();
-          const q = eqQuery.value.trim();
           const rutaNumero = eqRuta.value.trim();
           const fecha = eqFecha.value.trim();
 
-          if (q) {
-            params.set('q', q);
-          }
           if (rutaNumero) {
             params.set('rutaNumero', rutaNumero);
           }
@@ -963,7 +974,6 @@
 
       logoutButton.addEventListener('click', () => {
         currentRutaNumero = '';
-        eqQuery.value = '';
         eqRuta.value = '';
         eqFecha.value = '';
         setStatus(equiposStatus, '', '');
