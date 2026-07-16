@@ -66,7 +66,8 @@ export class EquiposService {
           acuerdoNivelServicio: `${equipo.acuerdoNivelServicioDh}DH`,
         })),
       };
-    } catch {
+    } catch (error) {
+      console.error('Error en EquiposService.findAll:', error);
       return {
         calendario: getBusinessDayContext(new Date(), getConfiguredHolidaySet()),
         equipos: [],
