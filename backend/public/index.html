@@ -297,6 +297,21 @@
         flex-wrap: wrap;
       }
 
+      .stack {
+        display: grid;
+        gap: 12px;
+        align-content: start;
+      }
+
+      .calendar {
+        font-size: 12px;
+        color: var(--muted);
+        padding: 8px 10px;
+        border: 1px solid #e7eaf0;
+        border-radius: 8px;
+        background: #f9fafc;
+      }
+
       .small-btn {
         min-height: 34px;
         border-radius: 8px;
@@ -424,9 +439,27 @@
             <div id="crudStatus" class="status" role="status" aria-live="polite"></div>
           </section>
 
-          <section class="panel">
-            <h3>Listado</h3>
-            <div id="listaHallazgos" class="list"></div>
+          <section class="stack">
+            <section class="panel">
+              <h3>Consulta de Equipos (SPEC2)</h3>
+              <div class="grid-2">
+                <input id="eqQuery" type="text" placeholder="Buscar por ID o nombre" />
+                <input id="eqRuta" type="text" placeholder="Ruta (ej: 15)" />
+              </div>
+              <div class="grid-2">
+                <input id="eqFecha" type="date" />
+                <button id="btnEquiposHoy" class="ghost" type="button">Hoy habil</button>
+              </div>
+              <button id="btnEquiposBuscar" class="ghost" type="button">Consultar equipos</button>
+              <div id="equiposStatus" class="status" role="status" aria-live="polite"></div>
+              <div id="equiposCalendario" class="calendar">Calendario pendiente de consulta.</div>
+              <div id="listaEquipos" class="list"></div>
+            </section>
+
+            <section class="panel">
+              <h3>Listado Hallazgos (SPEC1)</h3>
+              <div id="listaHallazgos" class="list"></div>
+            </section>
           </section>
         </div>
       </section>
@@ -464,8 +497,85 @@
       const cObservacion = document.getElementById('cObservacion');
       const btnCrear = document.getElementById('btnCrear');
       const btnLimpiarCrear = document.getElementById('btnLimpiarCrear');
+      const eqQuery = document.getElementById('eqQuery');
+      const eqRuta = document.getElementById('eqRuta');
+      const eqFecha = document.getElementById('eqFecha');
+      const btnEquiposHoy = document.getElementById('btnEquiposHoy');
+      const btnEquiposBuscar = document.getElementById('btnEquiposBuscar');
+      const equiposStatus = document.getElementById('equiposStatus');
+      const equiposCalendario = document.getElementById('equiposCalendario');
+      const listaEquipos = document.getElementById('listaEquipos');
       let currentRutaNumero = '';
       let availableModulos = [];
+
+      function renderEquipos(data) {
+        const calendario = data?.calendario || null;
+        const equipos = Array.isArray(data?.equipos) ? data.equipos : [];
+        const mensaje = String(data?.mensaje || 'Consulta ejecutada.');
+
+        if (calendario) {
+          equiposCalendario.textContent = `Fecha: ${calendario.dateIso} | Dia habil: ${calendario.isBusinessDay ? 'SI' : 'NO'} | Indice habil: ${calendario.businessDayIndex}`;
+        } else {
+          equiposCalendario.textContent = 'Sin datos de calendario.';
+        }
+
+        if (!equipos.length) {
+          listaEquipos.innerHTML = '<div class="small-note">No hay equipos para los filtros aplicados.</div>';
+          setStatus(equiposStatus, mensaje, calendario?.isBusinessDay ? '' : 'ok');
+          return;
+        }
+
+        listaEquipos.innerHTML = equipos
+          .map((equipo) => {
+            return `
+              <article class="item">
+                <div class="item-head">
+                  <strong>${equipo.idEquipo} · ${equipo.nombreEquipo}</strong>
+                  <span class="badge pendiente">Ruta ${equipo.rutaNumero ?? '-'}</span>
+                </div>
+                <div class="meta">SLA: ${equipo.acuerdoNivelServicioDh ?? '-'} dia(s) habiles | Estado: ${equipo.estado ?? '-'}</div>
+              </article>
+            `;
+          })
+          .join('');
+
+        setStatus(equiposStatus, `${mensaje} (${equipos.length} equipo(s)).`, 'ok');
+      }
+
+      async function consultarEquipos() {
+        setStatus(equiposStatus, 'Consultando equipos...', '');
+        try {
+          const params = new URLSearchParams();
+          const q = eqQuery.value.trim();
+          const rutaNumero = eqRuta.value.trim();
+          const fecha = eqFecha.value.trim();
+
+          if (q) {
+            params.set('q', q);
+          }
+          if (rutaNumero) {
+            params.set('rutaNumero', rutaNumero);
+          }
+          if (fecha) {
+            params.set('fecha', fecha);
+          }
+
+          const endpoint = params.toString() ? `/equipos?${params.toString()}` : '/equipos';
+          const response = await fetch(endpoint);
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            const message = data?.message || 'No fue posible consultar equipos.';
+            throw new Error(Array.isArray(message) ? message.join(', ') : String(message));
+          }
+
+          renderEquipos(data);
+        } catch (error) {
+          equiposCalendario.textContent = 'Sin datos de calendario.';
+          listaEquipos.innerHTML = '<div class="small-note">No fue posible obtener equipos.</div>';
+          setStatus(equiposStatus, error.message || 'Error consultando equipos.', 'error');
+        }
+      }
 
       function equipoRutaErrorMessage() {
         const ruta = String(currentRutaNumero || '').trim();
@@ -820,6 +930,7 @@
 
           const tecnico = data?.tecnico;
           currentRutaNumero = tecnico?.rutaNumero || '';
+          eqRuta.value = currentRutaNumero;
           const userText = tecnico
             ? `Tecnico: ${tecnico.nombre} | Cedula: ${tecnico.cedula} | Ruta: ${tecnico.rutaNumero}`
             : `Usuario autenticado: ${cedula}`;
@@ -827,6 +938,11 @@
           await loadModuloCatalog();
           showHallazgos(userText);
           setStatus(loginStatus, 'Acceso concedido.', 'ok');
+          renderEquipos({
+            mensaje: data?.mensaje || 'Equipos cargados desde login.',
+            calendario: data?.calendario,
+            equipos: data?.equipos,
+          });
           await consultarHallazgos();
         } catch (error) {
           setStatus(loginStatus, error.message || 'Error inesperado en el inicio de sesion.', 'error');
@@ -839,9 +955,20 @@
       btnLimpiarFiltros.addEventListener('click', clearFiltros);
       btnCrear.addEventListener('click', crearHallazgo);
       btnLimpiarCrear.addEventListener('click', clearCrearHallazgoForm);
+      btnEquiposBuscar.addEventListener('click', consultarEquipos);
+      btnEquiposHoy.addEventListener('click', () => {
+        eqFecha.value = '';
+        consultarEquipos();
+      });
 
       logoutButton.addEventListener('click', () => {
         currentRutaNumero = '';
+        eqQuery.value = '';
+        eqRuta.value = '';
+        eqFecha.value = '';
+        setStatus(equiposStatus, '', '');
+        equiposCalendario.textContent = 'Calendario pendiente de consulta.';
+        listaEquipos.innerHTML = '';
         showLogin();
       });
     </script>
