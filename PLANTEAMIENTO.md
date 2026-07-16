@@ -127,21 +127,27 @@ Integración con Salesforce.
 IA para redactar informes.
 
 7.  Requisitos funcionales RF-01 El sistema debe mostrar automáticamente
-    los equipos programados para el día hábil actual. RF-02 El sistema
-    debe permitir buscar equipos por ID o por nombre del equipo. RF-03
-    El sistema debe consultar los hallazgos abiertos, pendientes y
-    solucionados de los últimos cinco meses. RF-04 El sistema debe
-    permitir actualizar un hallazgo como Pendiente o Solucionado. RF-05
-    El sistema debe permitir crear un nuevo hallazgo si el técnico
-    considera que el problema es diferente. RF-06 El sistema debe
-    generar automáticamente el informe de mantenimiento mediante
-    plantillas por módulo, con una estructura en párrafos, una sección
-    de texto predeterminado editable y subsecciones de hallazgos
-    abiertos, pendientes y solucionados cuando correspondan. RF-07 El
-    sistema debe permitir seleccionar entre 1 y 3 módulos por
-    mantenimiento. RF-08 El sistema debe permitir editar el informe
-    antes de guardarlo. RF-09 El sistema debe guardar el informe final
-    como texto en la base de datos.
+    los equipos programados para el día hábil actual. 
+    RF-02 El sistema
+    debe permitir buscar equipos por ID o por nombre del equipo.
+     RF-03
+    El sistema debe consultar los hallazgos abiertos de los últimos
+    cinco meses. 
+    RF-04 
+    El sistema debe permitir actualizar un hallazgo
+    como Pendiente o Solucionado. 
+    RF-05
+     El sistema debe permitir crear
+    un nuevo hallazgo si el técnico considera que el problema es
+    diferente. 
+    RF-06 El sistema debe generar automáticamente el informe
+    de mantenimiento mediante plantillas por módulo. 
+    RF-07 
+    El sistema debe permitir seleccionar entre 1 y 3 módulos por mantenimiento.
+    RF-08 
+    El sistema debe permitir editar el informe antes de guardarlo.
+    RF-09
+     El sistema debe guardar el informe final en la base de datos.
 
 8.  Requisitos no funcionales RNF-01 Rendimiento La consulta de equipos
     y hallazgos debe responder en menos de 3 segundos. RNF-02 Generación
