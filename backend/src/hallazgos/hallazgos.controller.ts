@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { HallazgosService } from './hallazgos.service';
 
 @Controller('hallazgos')
@@ -10,23 +10,24 @@ export class HallazgosController {
     @Query('equipoId') equipoId?: string,
     @Query('estado') estado?: string,
     @Query('modulo') modulo?: string,
-    @Query('codigoEquipo') codigoEquipo?: string,
+    @Query('nombreEquipo') nombreEquipo?: string,
+    @Headers('x-ruta-numero') rutaNumero?: string,
   ) {
-    return this.hallazgosService.findAll(equipoId, estado, modulo, codigoEquipo);
+    return this.hallazgosService.findAll(equipoId, estado, modulo, nombreEquipo, rutaNumero);
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.hallazgosService.create(body);
+  create(@Body() body: any, @Headers('x-ruta-numero') rutaNumero?: string) {
+    return this.hallazgosService.create(body, rutaNumero);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.hallazgosService.update(+id, body);
+  update(@Param('id') id: string, @Body() body: any, @Headers('x-ruta-numero') rutaNumero?: string) {
+    return this.hallazgosService.update(+id, body, rutaNumero);
   }
 
   @Put(':id')
-  replace(@Param('id') id: string, @Body() body: any) {
-    return this.hallazgosService.update(+id, body);
+  replace(@Param('id') id: string, @Body() body: any, @Headers('x-ruta-numero') rutaNumero?: string) {
+    return this.hallazgosService.update(+id, body, rutaNumero);
   }
 }

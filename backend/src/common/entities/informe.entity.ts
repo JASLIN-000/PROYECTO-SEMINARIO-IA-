@@ -23,9 +23,6 @@ export class Informe {
   @Column('text', { nullable: true })
   recomendaciones!: string | null;
 
-  @Column('text', { name: 'plantillas_aplicadas_text', default: '[]' })
-  plantillasAplicadasText!: string;
-
   @Column({ name: 'fecha_generacion', type: 'timestamp', default: () => 'NOW()' })
   fechaGeneracion!: Date;
 

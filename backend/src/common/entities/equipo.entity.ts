@@ -18,5 +18,5 @@ export class Equipo {
   estado!: string;
 
   @Column({ name: 'ruta_numero', type: 'varchar', length: 20, nullable: true })
-  rutaNumero?: string;
+  rutaNumero!: string | null;
 }

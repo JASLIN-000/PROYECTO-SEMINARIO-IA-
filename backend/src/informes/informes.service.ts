@@ -1,9 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateInformeDto } from '../common/dto/create-informe.dto';
 import { Informe } from '../common/entities/informe.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
+
+const ALLOWED_MODULES = [
+  'VERIFICACION DE SEGURIDAD Y CALIDAD',
+  'LIMPIEZA L1',
+  'LIMPIEZA L2',
+  'SISTEMA PARACAIDA, LIMITADOR DE VELOCIDAD Y PESACARGAS',
+  'LIMPIEZA L3',
+  'SISTEMA MAQUINA FRENO',
+  'SISTEMA SUSPENSION',
+  'SISTEMA ELECTRIFICACION',
+  'SISTEMA PUERTAS DE CABINA',
+  'SISTEMA PUERTAS DE PISO',
+  'ACTUALIZAR EQUIPO',
+  'CAMBIO DE CABLES',
+];
+
+const ALLOWED_MODULES_BY_KEY = new Map(ALLOWED_MODULES.map((moduleName) => [normalizeModuleKey(moduleName), moduleName]));
 
 @Injectable()
 export class InformesService {
@@ -42,13 +59,6 @@ export class InformesService {
       observaciones,
       pendientes: this.normalizeOptionalText(body.pendientes),
       recomendaciones: this.normalizeOptionalText(body.recomendaciones),
-      plantillasAplicadasText: JSON.stringify(
-        plantillas.map((plantilla) => ({
-          id: plantilla.id,
-          modulo: plantilla.modulo,
-          observacionEstandar: plantilla.observacionEstandar,
-        })),
-      ),
       fechaGeneracion: new Date(),
     });
 
@@ -67,11 +77,13 @@ export class InformesService {
           observaciones TEXT NOT NULL,
           pendientes TEXT NULL,
           recomendaciones TEXT NULL,
-          plantillas_aplicadas_text TEXT NOT NULL DEFAULT '[]',
           fecha_generacion TIMESTAMP NOT NULL DEFAULT NOW(),
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
+
+        ALTER TABLE informes
+        DROP COLUMN IF EXISTS plantillas_aplicadas_text;
 
         CREATE INDEX IF NOT EXISTS idx_informes_fecha_generacion ON informes(fecha_generacion DESC);
         CREATE INDEX IF NOT EXISTS idx_informes_equipo_id ON informes(equipo_id);
@@ -101,18 +113,40 @@ export class InformesService {
       : [body.modulo].filter((value): value is string => typeof value === 'string');
 
     const uniqueModules = new Map<string, string>();
+    const invalidModules: string[] = [];
 
     rawModules
       .map((item) => String(item).trim())
       .filter(Boolean)
       .forEach((modulo) => {
-        const key = modulo.toLowerCase();
+        const key = normalizeModuleKey(modulo);
+        const allowedModule = ALLOWED_MODULES_BY_KEY.get(key);
+
+        if (!allowedModule) {
+          invalidModules.push(modulo);
+          return;
+        }
+
         if (!uniqueModules.has(key)) {
-          uniqueModules.set(key, modulo);
+          uniqueModules.set(key, allowedModule);
         }
       });
 
-    return Array.from(uniqueModules.values()).slice(0, 3);
+    if (invalidModules.length) {
+      throw new BadRequestException(
+        `Modulo(s) no permitido(s): ${invalidModules.join(', ')}. Solo se permiten: ${ALLOWED_MODULES.join(', ')}`,
+      );
+    }
+
+    if (!uniqueModules.size) {
+      throw new BadRequestException(`Debes seleccionar al menos un modulo permitido. Opciones: ${ALLOWED_MODULES.join(', ')}`);
+    }
+
+    if (uniqueModules.size > 3) {
+      throw new BadRequestException('Solo se permiten entre 1 y 3 modulos por mantenimiento.');
+    }
+
+    return Array.from(uniqueModules.values());
   }
 
   private composeTemplateText(plantillas: Plantilla[]) {
@@ -146,7 +180,6 @@ export class InformesService {
       observaciones: informe.observaciones,
       pendientes: informe.pendientes,
       recomendaciones: informe.recomendaciones,
-      plantillasAplicadas: this.parseJsonArray(informe.plantillasAplicadasText),
       fechaGeneracion:
         informe.fechaGeneracion instanceof Date
           ? informe.fechaGeneracion.toISOString()
@@ -171,4 +204,11 @@ export class InformesService {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
+}
+
+function normalizeModuleKey(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
 }
