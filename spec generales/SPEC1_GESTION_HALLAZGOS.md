@@ -10,6 +10,7 @@ Este módulo cubre:
 - Creación de nuevos hallazgos cuando el problema es diferente.
 - Actualización de estado entre Pendiente y Solucionado.
 - Asociación del hallazgo a un equipo, un mantenimiento y un módulo.
+- Validación de que el equipo consultado o registrado pertenezca a la ruta asociada al usuario autenticado.
 
 ## 3. Actores
 - Técnico de mantenimiento.
@@ -27,6 +28,7 @@ Como técnico de mantenimiento, quiero consultar los hallazgos abiertos, pendien
 - RF-06: El sistema debe permitir registrar si un hallazgo requiere cotización.
 - RF-07: El sistema debe asociar cada hallazgo a un equipo y a un mantenimiento.
 - RF-08: El sistema debe permitir registrar observaciones adicionales del técnico.
+- RF-09: Si se consulta o registra un equipo por id o nombre y este no pertenece a la ruta asociada al usuario y contraseña autenticados, el sistema debe responder: "Equipo no pertenece a la ruta".
 
 ## 6. Requisitos no funcionales
 - RNF-01: La consulta de hallazgos debe responder en menos de 3 segundos.
@@ -36,6 +38,7 @@ Como técnico de mantenimiento, quiero consultar los hallazgos abiertos, pendien
 
 ## 7. Reglas de negocio
 - Un hallazgo debe estar asociado a un equipo existente.
+- Un hallazgo solo puede consultarse o registrarse para equipos que pertenezcan a la ruta asociada al usuario autenticado.
 - El estado de un hallazgo solo puede ser Abierto, Pendiente o Solucionado.
 - Si un hallazgo estaba Pendiente y luego se resuelve en el mismo mantenimiento, debe registrarse como Solucionado.
 - Un hallazgo abierto implica que se encontró un problema que requiere cotización.

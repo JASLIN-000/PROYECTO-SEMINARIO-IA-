@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TrazaDH | Gestion de Hallazgos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1f2228;
+        --muted: #808792;
+        --line: #d7dbe1;
+        --bg-1: #f4f6f8;
+        --bg-2: #eef1f6;
+        --brand-dark: #8e0000;
+        --brand: #c62828;
+        --brand-hover: #af2020;
+        --ok: #1f8f4e;
+        --error: #b42318;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 10% 8%, #ffffff 0%, transparent 30%),
+          radial-gradient(circle at 90% 18%, #fff2f2 0%, transparent 24%),
+          linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+      }
+
+      .app {
+        min-height: 100vh;
+        padding: 16px;
+        display: grid;
+        place-items: center;
+      }
+
+      .screen {
+        width: min(1150px, 100%);
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e7eaf0;
+        box-shadow: 0 22px 56px rgba(33, 40, 50, 0.12);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .login-layout {
+        min-height: 560px;
+        display: grid;
+        grid-template-columns: 56% 44%;
+      }
+
+      .left {
+        background: var(--brand-dark);
+        color: #ffffff;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        text-align: center;
+        padding: 32px;
+      }
+
+      .left h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3.5vw, 3rem);
+        letter-spacing: -0.03em;
+      }
+
+      .left p {
+        margin: 12px 0 0;
+        max-width: 34ch;
+        color: #f4dede;
+        line-height: 1.55;
+      }
+
+      .right {
+        display: grid;
+        place-items: center;
+        padding: 30px 24px;
+      }
+
+      .form {
+        width: min(340px, 100%);
+        display: grid;
+        gap: 14px;
+      }
+
+      .form h2 {
+        margin: 0;
+        font-size: 1.35rem;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        min-height: 42px;
+        padding: 8px 10px;
+        outline: none;
+        background: #fff;
+        font: inherit;
+        color: var(--ink);
+      }
+
+      textarea {
+        min-height: 84px;
+        resize: vertical;
+      }
+
+      .toggle {
+        border: none;
+        background: transparent;
+        color: #69707c;
+        font-size: 0.84rem;
+        font-weight: 600;
+        justify-self: end;
+        cursor: pointer;
+      }
+
+      .cta,
+      .ghost {
+        min-height: 44px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .cta {
+        background: var(--brand);
+        color: #fff;
+      }
+
+      .cta:hover {
+        background: var(--brand-hover);
+      }
+
+      .ghost {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: #3f4552;
+      }
+
+      .status {
+        min-height: 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .status.error {
+        color: var(--error);
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2.4px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        margin: 0 auto;
+      }
+
+      .hallazgos-screen {
+        min-height: 640px;
+        padding: 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .topbar h2 {
+        margin: 0;
+        font-size: 1.08rem;
+      }
+
+      .sub {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 390px 1fr;
+        gap: 12px;
+      }
+
+      .panel {
+        border: 1px solid #e6e9ef;
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+        display: grid;
+        gap: 10px;
+      }
+
+      .panel h3 {
+        margin: 0;
+        font-size: 0.96rem;
+      }
+
+      .grid-2 {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+        max-height: 520px;
+        overflow: auto;
+        padding-right: 2px;
+      }
+
+      .item {
+        border: 1px solid #e7eaf0;
+        border-radius: 10px;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .item-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      .badge.abierto {
+        color: #9f1239;
+        background: #ffe4e6;
+      }
+
+      .badge.pendiente {
+        color: #92400e;
+        background: #fef3c7;
+      }
+
+      .badge.solucionado {
+        color: #166534;
+        background: #dcfce7;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .item-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .small-btn {
+        min-height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: #2f3542;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0 10px;
+      }
+
+      .small-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .login-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .left {
+          min-height: 160px;
+          padding: 22px;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section id="loginScreen" class="screen login-layout">
+        <aside class="left">
+          <h1>TrazaDH</h1>
+          <p>Inicia sesion para gestionar hallazgos: consultar ultimos 5 meses, filtrar, crear y actualizar estado.</p>
+        </aside>
+
+        <section class="right">
+          <form id="loginForm" class="form" novalidate>
+            <h2>Iniciar sesion</h2>
+            <input id="cedula" type="text" placeholder="Usuario / Cedula" minlength="4" maxlength="30" required />
+            <input id="password" type="password" placeholder="Contrasena" minlength="4" maxlength="100" required />
+            <button id="togglePassword" class="toggle" type="button">Mostrar contrasena</button>
+            <button id="submitButton" class="cta" type="submit"><span id="submitLabel">Ingresar</span></button>
+            <div id="loginStatus" class="status" role="status" aria-live="polite"></div>
+          </form>
+        </section>
+      </section>
+
+      <section id="hallazgosScreen" class="screen hallazgos-screen hidden">
+        <div class="topbar">
+          <div>
+            <h2>Gestion de Hallazgos (SPEC1)</h2>
+            <p id="userInfo" class="sub"></p>
+          </div>
+          <button id="logoutButton" class="ghost" style="padding:0 14px;">Cerrar sesion</button>
+        </div>
+
+        <div class="layout">
+          <section class="panel">
+            <h3>Consultar y filtrar</h3>
+            <div class="grid-2">
+              <input id="fEquipoId" type="text" placeholder="ID equipo (ej: 068S-01)" />
+              <input id="fNombreEquipo" type="text" placeholder="Nombre equipo" />
+            </div>
+            <div class="grid-2">
+              <select id="fEstado">
+                <option value="">Todos los estados</option>
+                <option value="ABIERTO">Abierto</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="SOLUCIONADO">Solucionado</option>
+              </select>
+              <select id="fModulo">
+                <option value="">Todos los modulos</option>
+              </select>
+            </div>
+            <div class="grid-2">
+              <button id="btnConsultar" class="ghost" type="button">Consultar hallazgos</button>
+              <button id="btnLimpiarFiltros" class="ghost" type="button">Limpiar filtros</button>
+            </div>
+            <p class="small-note">Se cargan por defecto los ultimos 5 meses.</p>
+
+            <h3>Crear hallazgo nuevo</h3>
+            <div class="grid-2">
+              <input id="cEquipoId" type="text" placeholder="ID equipo* (ej: 068S-01)" />
+              <input id="cMantenimientoId" type="number" min="1" placeholder="Mantenimiento ID (opcional)" />
+            </div>
+            <div class="grid-2">
+              <input id="cTipo" type="text" placeholder="Tipo mantenimiento" value="PREVENTIVO" />
+              <select id="cModulo" required>
+                <option value="">Selecciona modulo*</option>
+              </select>
+            </div>
+            <textarea id="cDescripcion" placeholder="Descripcion del hallazgo*"></textarea>
+            <div class="grid-2">
+              <select id="cCotizacion">
+                <option value="NO">Cotizacion: NO</option>
+                <option value="SI">Cotizacion: SI</option>
+                <option value="NA">Cotizacion: NA</option>
+              </select>
+              <select id="cEstado">
+                <option value="ABIERTO">Estado: Abierto</option>
+                <option value="PENDIENTE">Estado: Pendiente</option>
+                <option value="SOLUCIONADO">Estado: Solucionado</option>
+              </select>
+            </div>
+            <textarea id="cObservacion" placeholder="Observacion"></textarea>
+            <div class="grid-2">
+              <button id="btnCrear" class="cta" type="button">Crear hallazgo</button>
+              <button id="btnLimpiarCrear" class="ghost" type="button">Limpiar formulario</button>
+            </div>
+            <div id="crudStatus" class="status" role="status" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <h3>Listado</h3>
+            <div id="listaHallazgos" class="list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const loginScreen = document.getElementById('loginScreen');
+      const hallazgosScreen = document.getElementById('hallazgosScreen');
+      const loginForm = document.getElementById('loginForm');
+      const cedulaInput = document.getElementById('cedula');
+      const passwordInput = document.getElementById('password');
+      const togglePasswordButton = document.getElementById('togglePassword');
+      const submitButton = document.getElementById('submitButton');
+      const submitLabel = document.getElementById('submitLabel');
+      const loginStatus = document.getElementById('loginStatus');
+      const crudStatus = document.getElementById('crudStatus');
+      const userInfo = document.getElementById('userInfo');
+      const logoutButton = document.getElementById('logoutButton');
+      const listaHallazgos = document.getElementById('listaHallazgos');
+
+      const fEquipoId = document.getElementById('fEquipoId');
+      const fNombreEquipo = document.getElementById('fNombreEquipo');
+      const fEstado = document.getElementById('fEstado');
+      const fModulo = document.getElementById('fModulo');
+      const btnConsultar = document.getElementById('btnConsultar');
+      const btnLimpiarFiltros = document.getElementById('btnLimpiarFiltros');
+
+      const cEquipoId = document.getElementById('cEquipoId');
+      const cMantenimientoId = document.getElementById('cMantenimientoId');
+      const cTipo = document.getElementById('cTipo');
+      const cModulo = document.getElementById('cModulo');
+      const cDescripcion = document.getElementById('cDescripcion');
+      const cCotizacion = document.getElementById('cCotizacion');
+      const cEstado = document.getElementById('cEstado');
+      const cObservacion = document.getElementById('cObservacion');
+      const btnCrear = document.getElementById('btnCrear');
+      const btnLimpiarCrear = document.getElementById('btnLimpiarCrear');
+      let currentRutaNumero = '';
+      let availableModulos = [];
+
+      function equipoRutaErrorMessage() {
+        const ruta = String(currentRutaNumero || '').trim();
+        return ruta
+          ? `Equipo no pertenece a la ruta ${ruta}.`
+          : 'Equipo no encontrado.';
+      }
+
+      function buildRutaHeaders(baseHeaders = {}) {
+        const headers = { ...baseHeaders };
+        if (String(currentRutaNumero || '').trim()) {
+          headers['x-ruta-numero'] = currentRutaNumero.trim();
+        }
+        return headers;
+      }
+
+      function isValidEquipoCode(value) {
+        return /^\d{3,5}s-\d{2}$/i.test(String(value || '').trim());
+      }
+
+      function normalizeEquipoCode(value) {
+        return String(value || '').trim().toUpperCase();
+      }
+
+      function renderModuloOptions(modulos) {
+        const unique = Array.from(new Set((modulos || []).map((item) => String(item || '').trim()).filter(Boolean)))
+          .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+        availableModulos = unique;
+
+        fModulo.innerHTML = '<option value="">Todos los modulos</option>';
+        cModulo.innerHTML = '<option value="">Selecciona modulo*</option>';
+
+        unique.forEach((modulo) => {
+          const filterOption = document.createElement('option');
+          filterOption.value = modulo;
+          filterOption.textContent = modulo;
+          fModulo.appendChild(filterOption);
+
+          const createOption = document.createElement('option');
+          createOption.value = modulo;
+          createOption.textContent = modulo;
+          cModulo.appendChild(createOption);
+        });
+      }
+
+      async function loadModuloCatalog() {
+        const response = await fetch('/plantillas');
+        const data = await response.json().catch(() => ([]));
+
+        if (!response.ok) {
+          throw new Error('No fue posible cargar el catalogo de modulos.');
+        }
+
+        const modulos = Array.isArray(data)
+          ? data.map((item) => item?.modulo)
+          : [];
+
+        renderModuloOptions(modulos);
+
+        if (!availableModulos.length) {
+          throw new Error('No hay modulos configurados en plantillas.');
+        }
+      }
+
+      function setStatus(el, message, kind) {
+        el.textContent = message;
+        el.className = 'status';
+        if (kind) {
+          el.classList.add(kind);
+        }
+      }
+
+      function showLogin() {
+        hallazgosScreen.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+      }
+
+      function showHallazgos(userText) {
+        loginScreen.classList.add('hidden');
+        hallazgosScreen.classList.remove('hidden');
+        userInfo.textContent = userText;
+      }
+
+      function setLoginLoading(isLoading) {
+        submitButton.disabled = isLoading;
+        submitLabel.innerHTML = isLoading
+          ? '<span class="spinner" aria-hidden="true"></span>'
+          : 'Ingresar';
+      }
+
+      function buildQuery() {
+        const params = new URLSearchParams();
+
+        if (fEquipoId.value.trim()) {
+          params.set('equipoId', fEquipoId.value.trim());
+        }
+        if (fNombreEquipo.value.trim()) {
+          params.set('nombreEquipo', fNombreEquipo.value.trim());
+        }
+        if (fEstado.value) {
+          params.set('estado', fEstado.value);
+        }
+        if (fModulo.value.trim()) {
+          params.set('modulo', fModulo.value.trim());
+        }
+
+        return params.toString();
+      }
+
+      function clearFiltros() {
+        fEquipoId.value = '';
+        fNombreEquipo.value = '';
+        fEstado.value = '';
+        fModulo.value = '';
+        setStatus(crudStatus, 'Filtros limpiados.', 'ok');
+      }
+
+      function clearCrearHallazgoForm() {
+        cEquipoId.value = '';
+        cMantenimientoId.value = '';
+        cTipo.value = 'PREVENTIVO';
+        cModulo.value = '';
+        cDescripcion.value = '';
+        cCotizacion.value = 'NO';
+        cEstado.value = 'ABIERTO';
+        cObservacion.value = '';
+        setStatus(crudStatus, 'Formulario de hallazgo limpiado.', 'ok');
+      }
+
+      function estadoClass(estado) {
+        const key = String(estado || '').toLowerCase();
+        if (key === 'solucionado') return 'solucionado';
+        if (key === 'pendiente') return 'pendiente';
+        return 'abierto';
+      }
+
+      function renderHallazgos(items) {
+        if (!Array.isArray(items) || !items.length) {
+          listaHallazgos.innerHTML = '<div class="small-note">No hay hallazgos para los filtros aplicados.</div>';
+          return;
+        }
+
+        listaHallazgos.innerHTML = items
+          .map((h) => {
+            const estado = String(h.estado || 'ABIERTO').toUpperCase();
+            const estadoCss = estadoClass(estado);
+            return `
+              <article class="item">
+                <div class="item-head">
+                  <strong>#${h.id} · ${h.nombreEquipo || 'Equipo sin nombre'} · Modulo ${h.modulo ?? '-'}</strong>
+                  <span class="badge ${estadoCss}">${estado}</span>
+                </div>
+                <div>${h.descripcionHallazgo || 'Sin descripcion'}</div>
+                <div class="meta">ID equipo: ${h.idEquipo ?? '-'} | Mantenimiento: ${h.mantenimientoId ?? '-'} | Fecha hallazgo: ${h.fechaHallazgo ?? '-'} | Fecha solucion: ${h.fechaSolucion ?? '-'}</div>
+                <div class="meta">Observacion: ${h.observacion ?? '-'}</div>
+                <div class="item-actions">
+                  <button class="small-btn" data-action="pendiente" data-id="${h.id}">Marcar Pendiente</button>
+                  <button class="small-btn" data-action="solucionado" data-id="${h.id}">Marcar Solucionado</button>
+                </div>
+              </article>
+            `;
+          })
+          .join('');
+
+        listaHallazgos.querySelectorAll('.small-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const next = btn.dataset.action === 'solucionado' ? 'SOLUCIONADO' : 'PENDIENTE';
+            await updateEstadoHallazgo(id, next);
+          });
+        });
+      }
+
+      async function consultarHallazgos() {
+        setStatus(crudStatus, 'Consultando hallazgos...', '');
+        try {
+          const equipoFilter = fEquipoId.value.trim();
+          const nombreFilter = fNombreEquipo.value.trim();
+
+          if (equipoFilter && !isValidEquipoCode(equipoFilter)) {
+            throw new Error('ID de equipo invalido.');
+          }
+
+          if (nombreFilter && nombreFilter.length < 3) {
+            throw new Error('Nombre de equipo invalido. Debe ingresar al menos 3 letras.');
+          }
+
+          if (equipoFilter) {
+            fEquipoId.value = normalizeEquipoCode(equipoFilter);
+          }
+
+          const query = buildQuery();
+          const endpoint = query ? `/hallazgos?${query}` : '/hallazgos';
+          const response = await fetch(endpoint, {
+            headers: buildRutaHeaders(),
+          });
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            const message = data?.message || 'No fue posible consultar hallazgos.';
+            const normalized = Array.isArray(message) ? message.join(', ') : String(message);
+            const lowerMessage = normalized.toLowerCase();
+            if (lowerMessage.includes('equipo no pertenece a la ruta')) {
+              throw new Error(equipoRutaErrorMessage());
+            }
+            throw new Error(normalized);
+          }
+
+          const rows = Array.isArray(data) ? data : [];
+          renderHallazgos(rows);
+          setStatus(crudStatus, `Consulta completada: ${rows.length} registros.`, 'ok');
+        } catch (error) {
+          setStatus(crudStatus, error.message || 'Error consultando hallazgos.', 'error');
+        }
+      }
+
+      async function updateEstadoHallazgo(id, estado) {
+        try {
+          const payload = { estado };
+          if (estado === 'SOLUCIONADO') {
+            payload.fechaSolucion = new Date().toISOString().slice(0, 10);
+          }
+
+          const response = await fetch(`/hallazgos/${id}`, {
+            method: 'PATCH',
+            headers: buildRutaHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            throw new Error('No fue posible actualizar el estado del hallazgo.');
+          }
+
+          setStatus(crudStatus, `Hallazgo #${id} actualizado a ${estado}.`, 'ok');
+          await consultarHallazgos();
+        } catch (error) {
+          setStatus(crudStatus, error.message || 'Error actualizando hallazgo.', 'error');
+        }
+      }
+
+      async function crearHallazgo() {
+        const equipoId = normalizeEquipoCode(cEquipoId.value);
+        const mantenimientoId = cMantenimientoId.value.trim();
+        const modulo = cModulo.value.trim();
+        const descripcion = cDescripcion.value.trim();
+        const tipoMantenimiento = cTipo.value.trim();
+        const cotizacion = cCotizacion.value;
+        const estado = cEstado.value;
+
+        if (!equipoId || !tipoMantenimiento || !modulo || !descripcion || !cotizacion || !estado) {
+          setStatus(crudStatus, 'Campos obligatorios: ID equipo, tipo mantenimiento, modulo, descripcion, cotizacion y estado.', 'error');
+          return;
+        }
+
+        if (!availableModulos.includes(modulo)) {
+          setStatus(crudStatus, 'Debes seleccionar un modulo valido del catalogo.', 'error');
+          return;
+        }
+
+        if (!isValidEquipoCode(equipoId)) {
+          setStatus(crudStatus, 'ID de equipo invalido.', 'error');
+          return;
+        }
+
+        cEquipoId.value = equipoId;
+
+        const payload = {
+          equipoId,
+          tipoMantenimiento,
+          modulo,
+          descripcionHallazgo: descripcion,
+          cotizacion,
+          observacion: cObservacion.value.trim(),
+          estado,
+          fechaHallazgo: new Date().toISOString().slice(0, 10),
+        };
+
+        if (mantenimientoId) {
+          payload.mantenimientoId = Number(mantenimientoId);
+        }
+
+        try {
+          const response = await fetch('/hallazgos', {
+            method: 'POST',
+            headers: buildRutaHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload),
+          });
+          const created = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            const message = created?.message || 'No fue posible crear el hallazgo.';
+            const normalized = Array.isArray(message) ? message.join(', ') : String(message);
+            const lowerMessage = normalized.toLowerCase();
+            if (
+              lowerMessage.includes('equipo no pertenece a la ruta')
+            ) {
+              throw new Error(equipoRutaErrorMessage());
+            }
+            throw new Error(normalized);
+          }
+
+          setStatus(crudStatus, `Hallazgo creado con ID #${created.id}.`, 'ok');
+          clearCrearHallazgoForm();
+
+          const equipoCreado = String(created?.idEquipo || payload.equipoId || '').trim();
+          const normalizedEquipoCreado = equipoCreado ? normalizeEquipoCode(equipoCreado) : '';
+
+          fNombreEquipo.value = '';
+          fEstado.value = '';
+          fModulo.value = '';
+          fEquipoId.value = normalizedEquipoCreado;
+
+          setStatus(crudStatus, 'Hallazgo creado.', 'ok');
+          await consultarHallazgos();
+        } catch (error) {
+          setStatus(crudStatus, error.message || 'Error creando hallazgo.', 'error');
+        }
+      }
+
+      togglePasswordButton.addEventListener('click', () => {
+        const visible = passwordInput.type === 'text';
+        passwordInput.type = visible ? 'password' : 'text';
+        togglePasswordButton.textContent = visible ? 'Mostrar contrasena' : 'Ocultar contrasena';
+      });
+
+      loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const cedula = cedulaInput.value.trim();
+        const password = passwordInput.value;
+
+        if (cedula.length < 4 || password.length < 4) {
+          setStatus(loginStatus, 'Ingresa una cedula y contrasena validas.', 'error');
+          return;
+        }
+
+        setLoginLoading(true);
+        setStatus(loginStatus, '', '');
+
+        try {
+          const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cedula, password }),
+          });
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            const message = data?.message || 'No fue posible iniciar sesion.';
+            throw new Error(Array.isArray(message) ? message.join(', ') : String(message));
+          }
+
+          const tecnico = data?.tecnico;
+          currentRutaNumero = tecnico?.rutaNumero || '';
+          const userText = tecnico
+            ? `Tecnico: ${tecnico.nombre} | Cedula: ${tecnico.cedula} | Ruta: ${tecnico.rutaNumero}`
+            : `Usuario autenticado: ${cedula}`;
+
+          await loadModuloCatalog();
+          showHallazgos(userText);
+          setStatus(loginStatus, 'Acceso concedido.', 'ok');
+          await consultarHallazgos();
+        } catch (error) {
+          setStatus(loginStatus, error.message || 'Error inesperado en el inicio de sesion.', 'error');
+        } finally {
+          setLoginLoading(false);
+        }
+      });
+
+      btnConsultar.addEventListener('click', consultarHallazgos);
+      btnLimpiarFiltros.addEventListener('click', clearFiltros);
+      btnCrear.addEventListener('click', crearHallazgo);
+      btnLimpiarCrear.addEventListener('click', clearCrearHallazgoForm);
+
+      logoutButton.addEventListener('click', () => {
+        currentRutaNumero = '';
+        showLogin();
+      });
+    </script>
+  </body>
+</html>
