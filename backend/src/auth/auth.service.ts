@@ -23,7 +23,6 @@ export class AuthService {
     await this.ensureSchema();
 
     const cedula = body.cedula.trim();
-    const rutaNumero = body.rutaNumero.trim();
     const calendario = getBusinessDayContext(new Date(), getConfiguredHolidaySet());
     const tecnico = await this.tecnicosRepository.findOne({
       where: { cedula, activo: true },
@@ -37,17 +36,31 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
-    if (tecnico.rutaNumero !== rutaNumero) {
-      tecnico.rutaNumero = rutaNumero;
-      await this.tecnicosRepository.save(tecnico);
-    }
+    const rutaNumero = (body.rutaNumero?.trim() || tecnico.rutaNumero || '').trim();
+    let effectiveRutaNumero = rutaNumero;
 
     let equipos = calendario.isBusinessDay
-      ? await this.loadEquiposByRoute(rutaNumero, calendario.businessDayIndex)
+      ? await this.loadEquiposByRoute(effectiveRutaNumero, calendario.businessDayIndex)
       : [];
     let mensaje = 'Acceso concedido';
 
     if (!equipos.length) {
+      const rutasConfiguradas = await this.getConfiguredRoutes();
+      if (
+        rutasConfiguradas.length === 1
+        && rutasConfiguradas[0].toLowerCase() !== effectiveRutaNumero.toLowerCase()
+      ) {
+        effectiveRutaNumero = rutasConfiguradas[0];
+        tecnico.rutaNumero = effectiveRutaNumero;
+        await this.tecnicosRepository.save(tecnico);
+
+        equipos = calendario.isBusinessDay
+          ? await this.loadEquiposByRoute(effectiveRutaNumero, calendario.businessDayIndex)
+          : [];
+
+        mensaje = `Acceso concedido. Tu ruta fue ajustada automaticamente a ${effectiveRutaNumero} segun la configuracion de equipos.`;
+      }
+
       const hayRutasAsignadas = await this.equiposRepository
         .createQueryBuilder('equipo')
         .where('equipo.rutaNumero IS NOT NULL')
@@ -58,13 +71,13 @@ export class AuthService {
         await this.equiposRepository
           .createQueryBuilder()
           .update(Equipo)
-          .set({ rutaNumero })
+          .set({ rutaNumero: effectiveRutaNumero })
           .where('estado = :estado', { estado: 'ACTIVO' })
           .andWhere('(ruta_numero IS NULL OR BTRIM(ruta_numero) = \'\')')
           .execute();
 
         equipos = calendario.isBusinessDay
-          ? await this.loadEquiposByRoute(rutaNumero, calendario.businessDayIndex)
+          ? await this.loadEquiposByRoute(effectiveRutaNumero, calendario.businessDayIndex)
           : [];
 
         if (!calendario.isBusinessDay) {
@@ -86,7 +99,7 @@ export class AuthService {
         id: tecnico.id,
         cedula: tecnico.cedula,
         nombre: tecnico.nombre,
-        rutaNumero,
+        rutaNumero: effectiveRutaNumero,
       },
       calendario,
       equipos: equipos.map((equipo) => ({
@@ -101,12 +114,30 @@ export class AuthService {
   }
 
   private async loadEquiposByRoute(rutaNumero: string, businessDayIndex: number) {
+    if (!rutaNumero.trim()) {
+      return [];
+    }
+
     return this.equiposRepository
       .createQueryBuilder('equipo')
       .where('LOWER(equipo.rutaNumero) = :rutaNumero', { rutaNumero: rutaNumero.toLowerCase() })
       .andWhere('equipo.acuerdoNivelServicioDh = :businessDayIndex', { businessDayIndex })
       .orderBy('equipo.nombreEquipo', 'ASC')
       .getMany();
+  }
+
+  private async getConfiguredRoutes() {
+    const rows = await this.equiposRepository
+      .createQueryBuilder('equipo')
+      .select('DISTINCT BTRIM(equipo.rutaNumero)', 'rutaNumero')
+      .where('equipo.rutaNumero IS NOT NULL')
+      .andWhere("BTRIM(equipo.rutaNumero) <> ''")
+      .orderBy('rutaNumero', 'ASC')
+      .getRawMany<{ rutaNumero: string }>();
+
+    return rows
+      .map((row) => String(row.rutaNumero || '').trim())
+      .filter((value) => value.length > 0);
   }
 
   private async ensureSchema() {

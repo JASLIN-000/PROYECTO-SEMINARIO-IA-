@@ -8,6 +8,9 @@ export class Hallazgo {
   @Column({ name: 'equipo_id' })
   equipoId!: number;
 
+  @Column({ name: 'mantenimiento_id', type: 'integer', nullable: true })
+  mantenimientoId!: number | null;
+
   @Column({ name: 'tipo_mantenimiento' })
   tipoMantenimiento!: string;
 

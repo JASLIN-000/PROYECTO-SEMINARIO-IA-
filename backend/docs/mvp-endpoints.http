@@ -1,0 +1,107 @@
+@baseUrl = http://localhost:3000
+@json = application/json
+
+### 0) Health check
+GET {{baseUrl}}/health
+
+### 1) Login (Auth)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{
+  "cedula": "10101010",
+  "rutaNumero": "R1",
+  "password": "123456"
+}
+
+### 2) Equipos del dia habil actual (Spec2)
+GET {{baseUrl}}/equipos
+
+### 3) Equipos por busqueda (ID o nombre parcial)
+GET {{baseUrl}}/equipos?q=asc
+
+### 4) Equipos por ruta + fecha controlada
+GET {{baseUrl}}/equipos?rutaNumero=15&fecha=2026-07-15
+
+### 5) Equipos en fin de semana (debe volver mensaje claro y lista vacia)
+GET {{baseUrl}}/equipos?fecha=2026-07-18
+
+### 6) Plantillas (todas)
+GET {{baseUrl}}/plantillas
+
+### 7) Plantillas filtradas por modulo
+GET {{baseUrl}}/plantillas?modulo=electrico
+
+### 8) Hallazgos (todos)
+GET {{baseUrl}}/hallazgos
+
+### 8.1) Hallazgos por estado y modulo (SPEC1)
+GET {{baseUrl}}/hallazgos?estado=ABIERTO&modulo=electrico
+
+### 8.2) Hallazgos por nombre de equipo (SPEC1)
+GET {{baseUrl}}/hallazgos?nombreEquipo=RUE
+
+### 9) Crear hallazgo
+# @name crearHallazgo
+POST {{baseUrl}}/hallazgos
+Content-Type: {{json}}
+
+{
+  "equipoId": "245S-01",
+  "tipoMantenimiento": "PREVENTIVO",
+  "modulo": "electrico",
+  "descripcionHallazgo": "Ruido anormal en ascensor durante prueba funcional",
+  "cotizacion": "NO",
+  "observacion": "Se detecta vibracion leve en subida",
+  "estado": "ABIERTO",
+  "fechaHallazgo": "2026-07-15"
+}
+
+### 10) Consultar hallazgos por equipo
+GET {{baseUrl}}/hallazgos?equipoId=245S-01
+
+### 11) Actualizar hallazgo creado (PATCH)
+PATCH {{baseUrl}}/hallazgos/{{crearHallazgo.response.body.$.id}}
+Content-Type: {{json}}
+
+{
+  "estado": "SOLUCIONADO",
+  "fechaSolucion": "2026-07-15",
+  "observacion": "Se ajusto tension de polea y se valida operacion normal"
+}
+
+### 12) Reemplazar hallazgo creado (PUT)
+PUT {{baseUrl}}/hallazgos/{{crearHallazgo.response.body.$.id}}
+Content-Type: {{json}}
+
+{
+  "equipoId": "245S-01",
+  "tipoMantenimiento": "PREVENTIVO",
+  "modulo": "electrico",
+  "descripcionHallazgo": "Hallazgo reemplazado via PUT",
+  "cotizacion": "NO",
+  "observacion": "Registro actualizado por prueba de endpoint",
+  "estado": "PENDIENTE",
+  "fechaHallazgo": "2026-07-15"
+}
+
+### 13) Informes (listar)
+GET {{baseUrl}}/informes
+
+### 14) Crear informe con 1 a 3 modulos (Spec3)
+# @name crearInforme
+POST {{baseUrl}}/informes
+Content-Type: {{json}}
+
+{
+  "mantenimientoId": 2026071501,
+  "equipoId": 39,
+  "modulos": ["electrico", "mecanico"],
+  "observaciones": "Se realiza mantenimiento preventivo con limpieza de componentes y ajuste general.",
+  "pendientes": "Pendiente validar ruido en jornada nocturna",
+  "recomendaciones": "Programar inspeccion de vibraciones en 15 dias"
+}
+
+### 15) Informes (listar para validar persistencia)
+GET {{baseUrl}}/informes
