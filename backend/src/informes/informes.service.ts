@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { CreateInformeDto } from '../common/dto/create-informe.dto';
 import { Equipo } from '../common/entities/equipo.entity';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Informe } from '../common/entities/informe.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
+import { getBusinessDayContext, getConfiguredHolidaySet } from '../common/utils/business-days';
 
 const ALLOWED_MODULES = [
   'VERIFICACION DE SEGURIDAD Y CALIDAD',
@@ -47,41 +48,63 @@ export class InformesService {
       order: { fechaGeneracion: 'DESC' },
     });
 
-    return informes.map((informe) => this.toResponse(informe));
+    return this.enrichInformesResponse(informes);
   }
 
-  async preview(body: CreateInformeDto) {
+  async preview(body: CreateInformeDto, rutaNumero?: string) {
     await this.ensureSchema();
-    return this.buildDraft(body);
+    return this.buildDraft(body, rutaNumero);
   }
 
-  async create(body: CreateInformeDto) {
+  async create(body: CreateInformeDto, rutaNumero?: string) {
     await this.ensureSchema();
 
-    const draft = await this.buildDraft(body);
+    const draft = await this.buildDraft(body, rutaNumero);
     const observaciones = body.observaciones?.trim() || draft.textoGenerado || 'Informe sin plantilla asociada';
 
-    const informe = this.informesRepository.create({
-      mantenimientoId: draft.mantenimientoId,
-      equipoId: draft.equipoId,
-      modulosText: JSON.stringify(draft.modulos),
-      observaciones,
-      pendientes: this.normalizeOptionalText(body.pendientes),
-      recomendaciones: this.normalizeOptionalText(body.recomendaciones),
-      fechaGeneracion: new Date(),
-    });
+    const existing = await this.findExistingInforme(draft.equipoId, draft.mantenimientoId);
+    const entity = existing ?? this.informesRepository.create();
 
-    const saved = await this.informesRepository.save(informe);
+    entity.mantenimientoId = draft.mantenimientoId;
+    entity.equipoId = draft.equipoId;
+    entity.modulosText = JSON.stringify(draft.modulos);
+    entity.observaciones = observaciones;
+    entity.pendientes = this.normalizeOptionalText(body.pendientes);
+    entity.recomendaciones = this.normalizeOptionalText(body.recomendaciones);
+    entity.fechaGeneracion = new Date();
+
+    const saved = await this.informesRepository.save(entity);
+    const [response] = await this.enrichInformesResponse([saved]);
+
     return {
-      ...this.toResponse(saved),
+      ...response,
+      accion: existing ? 'actualizado' : 'creado',
       resumenHallazgos: draft.resumenHallazgos,
     };
   }
 
-  private async buildDraft(body: CreateInformeDto) {
+  private async findExistingInforme(equipoId: number | null, mantenimientoId: number | null) {
+    if (!equipoId) {
+      return null;
+    }
+
+    const query = this.informesRepository
+      .createQueryBuilder('informe')
+      .where('informe.equipoId = :equipoId', { equipoId });
+
+    if (mantenimientoId) {
+      query.andWhere('informe.mantenimientoId = :mantenimientoId', { mantenimientoId });
+    } else {
+      query.andWhere('informe.mantenimientoId IS NULL');
+    }
+
+    return query.orderBy('informe.fechaGeneracion', 'DESC').getOne();
+  }
+
+  private async buildDraft(body: CreateInformeDto, rutaNumero?: string) {
     const modulos = this.normalizeModules(body);
     const mantenimientoId = this.normalizeOptionalNumber(body.mantenimientoId);
-    const equipoId = await this.resolveEquipoId(body.equipoId, body.equipoCodigo);
+    const equipoId = await this.resolveEquipoId(body.equipoId, body.equipoCodigo, rutaNumero);
     const equipo = equipoId
       ? await this.equiposRepository.findOne({ where: { id: equipoId } })
       : null;
@@ -90,10 +113,8 @@ export class InformesService {
     const textoPlantillas = this.composeTemplateText(plantillas);
     const hallazgos = await this.loadHallazgosForDraft(equipoId, mantenimientoId);
     const seccionHallazgos = this.composeHallazgosSection(hallazgos);
-    const intro = this.composeIntro(mantenimientoId, equipo);
 
     const blocks = [
-      intro,
       textoPlantillas || 'No existe plantilla para alguno de los modulos seleccionados. Redaccion manual habilitada.',
       seccionHallazgos,
     ].filter(Boolean);
@@ -234,21 +255,6 @@ export class InformesService {
     return Array.from(uniqueModules.values());
   }
 
-  private composeIntro(mantenimientoId: number | null, equipo: Equipo | null) {
-    const scope: string[] = [];
-
-    if (mantenimientoId) {
-      scope.push(`Mantenimiento #${mantenimientoId}`);
-    }
-
-    if (equipo) {
-      scope.push(`Equipo ${equipo.idEquipo} - ${equipo.nombreEquipo}`);
-    }
-
-    const scopeText = scope.length ? ` (${scope.join(' | ')})` : '';
-    return `Informe tecnico generado${scopeText}. Este texto puede editarse por completo antes de guardar.`;
-  }
-
   private composeTemplateText(plantillas: Plantilla[]) {
     if (!plantillas.length) {
       return '';
@@ -275,13 +281,30 @@ export class InformesService {
       this.composeHallazgoSubsection('Hallazgos abiertos', abiertos),
       this.composeHallazgoSubsection('Hallazgos pendientes', pendientes),
       this.composeHallazgoSubsection('Hallazgos solucionados', solucionados),
+      this.composeCotizacionSuggestions(hallazgos),
     ].filter(Boolean);
 
     if (!sectionBlocks.length) {
       return '';
     }
 
-    return `Seccion de hallazgos (mantenimiento actual y ultimos 5 meses):\n\n${sectionBlocks.join('\n\n')}`;
+    return `Seccion de hallazgos\n\n${sectionBlocks.join('\n\n')}`;
+  }
+
+  private composeCotizacionSuggestions(hallazgos: Hallazgo[]) {
+    const requireCotizacion = hallazgos.filter((item) => String(item.cotizacion || '').trim().toUpperCase() === 'SI');
+    if (!requireCotizacion.length) {
+      return '';
+    }
+
+    const lines = requireCotizacion.map((item) => {
+      const fecha = item.fechaHallazgo || '-';
+      const modulo = item.modulo || '-';
+      const descripcion = item.descripcionHallazgo || 'Sin descripcion';
+      return `Se sugiere aprobar cotizacion correspondiente al hallazgo=[${fecha}] (${modulo}) ${descripcion}.`;
+    });
+
+    return lines.join('\n');
   }
 
   private composeHallazgoSubsection(title: string, hallazgos: Hallazgo[]) {
@@ -312,9 +335,15 @@ export class InformesService {
     return 'ABIERTO';
   }
 
-  private async resolveEquipoId(equipoId?: number, equipoCodigo?: string) {
+  private async resolveEquipoId(equipoId?: number, equipoCodigo?: string, rutaNumero?: string) {
     const normalizedId = this.normalizeOptionalNumber(equipoId);
     if (normalizedId) {
+      const equipo = await this.equiposRepository.findOne({ where: { id: normalizedId } });
+      if (!equipo) {
+        throw new BadRequestException('Equipo no encontrado.');
+      }
+
+      this.assertEquipoProgramadoHoy(equipo, rutaNumero);
       return normalizedId;
     }
 
@@ -332,7 +361,31 @@ export class InformesService {
       throw new BadRequestException(`No existe equipo con codigo ${code}.`);
     }
 
+    this.assertEquipoProgramadoHoy(equipo, rutaNumero);
+
     return equipo.id;
+  }
+
+  private assertEquipoProgramadoHoy(equipo: Equipo, rutaNumero?: string) {
+    const today = new Date();
+    const calendario = getBusinessDayContext(today, getConfiguredHolidaySet(today));
+
+    if (!calendario.isBusinessDay) {
+      throw new BadRequestException('Hoy no es dia habil. Solo se pueden generar informes para equipos programados en dia habil.');
+    }
+
+    if (String(equipo.estado || '').trim().toUpperCase() !== 'ACTIVO') {
+      throw new BadRequestException('El equipo no esta activo para generar informe.');
+    }
+
+    if (equipo.acuerdoNivelServicioDh !== calendario.businessDayIndex) {
+      throw new BadRequestException('El equipo no esta programado para el dia habil actual.');
+    }
+
+    const normalizedRoute = String(rutaNumero || '').trim().toLowerCase();
+    if (normalizedRoute && String(equipo.rutaNumero || '').trim().toLowerCase() !== normalizedRoute) {
+      throw new BadRequestException(`El equipo no pertenece a la ruta ${rutaNumero}.`);
+    }
   }
 
   private normalizeOptionalText(value?: string) {
@@ -364,6 +417,39 @@ export class InformesService {
           ? informe.fechaGeneracion.toISOString()
           : String(informe.fechaGeneracion),
     };
+  }
+
+  private async enrichInformesResponse(informes: Informe[]) {
+    if (!informes.length) {
+      return [];
+    }
+
+    const equipoIds = Array.from(
+      new Set(
+        informes
+          .map((informe) => Number(informe.equipoId))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      ),
+    );
+
+    const equipos = equipoIds.length
+      ? await this.equiposRepository.find({ where: { id: In(equipoIds) } })
+      : [];
+
+    const equiposById = new Map<number, Equipo>();
+    equipos.forEach((equipo) => {
+      equiposById.set(equipo.id, equipo);
+    });
+
+    return informes.map((informe) => {
+      const base = this.toResponse(informe);
+      const equipo = equiposById.get(Number(informe.equipoId));
+      return {
+        ...base,
+        equipoCodigo: equipo?.idEquipo ?? null,
+        equipoNombre: equipo?.nombreEquipo ?? null,
+      };
+    });
   }
 
   private parseJsonArray(raw: string) {

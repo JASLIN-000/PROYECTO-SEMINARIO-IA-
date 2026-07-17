@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
 import { CreateInformeDto } from '../common/dto/create-informe.dto';
 import { InformesService } from './informes.service';
 
@@ -12,12 +12,12 @@ export class InformesController {
   }
 
   @Post('preview')
-  preview(@Body() body: CreateInformeDto) {
-    return this.informesService.preview(body);
+  preview(@Body() body: CreateInformeDto, @Headers('x-ruta-numero') rutaNumero?: string) {
+    return this.informesService.preview(body, rutaNumero);
   }
 
   @Post()
-  create(@Body() body: CreateInformeDto) {
-    return this.informesService.create(body);
+  create(@Body() body: CreateInformeDto, @Headers('x-ruta-numero') rutaNumero?: string) {
+    return this.informesService.create(body, rutaNumero);
   }
 }

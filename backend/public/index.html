@@ -334,17 +334,24 @@
 
       .menu-grid {
         display: grid;
-        gap: 10px;
+        gap: 12px;
         grid-template-columns: repeat(3, 1fr);
       }
 
       .menu-card {
-        border: 1px solid #e6e9ef;
-        border-radius: 12px;
-        padding: 14px;
+        border: 1px solid #dfe4ec;
+        border-radius: 14px;
+        padding: 16px;
         background: #fff;
         display: grid;
         gap: 10px;
+        align-content: start;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+
+      .menu-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(35, 43, 55, 0.12);
       }
 
       .menu-card h3 {
@@ -352,8 +359,74 @@
         font-size: 1rem;
       }
 
+      .menu-card p {
+        margin: 0;
+      }
+
+      .menu-chip {
+        width: max-content;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        border-radius: 999px;
+        padding: 5px 9px;
+      }
+
+      .menu-card.spec1 {
+        background: linear-gradient(165deg, #ffffff 0%, #fff7f7 100%);
+        border-color: #f2d5d5;
+      }
+
+      .menu-card.spec2 {
+        background: linear-gradient(165deg, #ffffff 0%, #f6fbff 100%);
+        border-color: #d1e5f6;
+      }
+
+      .menu-card.spec3 {
+        background: linear-gradient(165deg, #ffffff 0%, #f7fcf8 100%);
+        border-color: #d5ead8;
+      }
+
+      .menu-card.spec1 .menu-chip {
+        background: #ffe4e6;
+        color: #9f1239;
+      }
+
+      .menu-card.spec2 .menu-chip {
+        background: #e0f2fe;
+        color: #075985;
+      }
+
+      .menu-card.spec3 .menu-chip {
+        background: #dcfce7;
+        color: #166534;
+      }
+
       .report-text {
         min-height: 160px;
+      }
+
+      .checklist {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: #fff;
+        display: grid;
+        gap: 6px;
+        max-height: 180px;
+        overflow: auto;
+      }
+
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.92rem;
+      }
+
+      .check-item input[type='checkbox'] {
+        width: 16px;
+        height: 16px;
       }
 
       @keyframes spin {
@@ -421,17 +494,20 @@
         <section id="specMenuView" class="panel">
           <h3>Primera visual: selecciona que SPEC quieres probar</h3>
           <div class="menu-grid">
-            <article class="menu-card">
+            <article class="menu-card spec1">
+              <span class="menu-chip">SPEC 1</span>
               <h3>SPEC1 · Hallazgos</h3>
               <p class="small-note">Consultar, filtrar, crear y actualizar estados de hallazgos.</p>
               <button id="goSpec1" class="cta" type="button">Probar SPEC1</button>
             </article>
-            <article class="menu-card">
+            <article class="menu-card spec2">
+              <span class="menu-chip">SPEC 2</span>
               <h3>SPEC2 · Equipos</h3>
               <p class="small-note">Consultar programacion por ruta y fecha habil.</p>
               <button id="goSpec2" class="cta" type="button">Probar SPEC2</button>
             </article>
-            <article class="menu-card">
+            <article class="menu-card spec3">
+              <span class="menu-chip">SPEC 3</span>
               <h3>SPEC3 · Informes</h3>
               <p class="small-note">Generar, editar y guardar informes de mantenimiento.</p>
               <button id="goSpec3" class="cta" type="button">Probar SPEC3</button>
@@ -520,9 +596,11 @@
               <h3>Generacion de Informes (SPEC3)</h3>
               <div class="grid-2">
                 <input id="iMantenimientoId" type="number" min="1" placeholder="Mantenimiento ID (opcional)" />
-                <input id="iEquipoCodigo" type="text" placeholder="Codigo equipo (ej: 4333S-01)" />
+                <select id="iEquipoProgramado">
+                  <option value="">Selecciona equipo programado del dia</option>
+                </select>
               </div>
-              <select id="iModulos" multiple size="6"></select>
+              <div id="iModulosChecklist" class="checklist"></div>
               <p class="small-note">Selecciona entre 1 y 3 modulos para generar el borrador.</p>
               <textarea id="iObservaciones" class="report-text" placeholder="Texto del informe editable"></textarea>
               <div class="grid-2">
@@ -535,6 +613,9 @@
               </div>
               <button id="btnInformeListar" class="ghost" type="button">Recargar informes</button>
               <div id="informeStatus" class="status" role="status" aria-live="polite"></div>
+              <h3>Informe seleccionado</h3>
+              <textarea id="informeDetalleTexto" class="report-text" readonly placeholder="Haz clic en un informe del historial para ver su contenido"></textarea>
+              <h3>Historial de informes</h3>
               <div id="listaInformes" class="list"></div>
             </section>
           </section>
@@ -593,8 +674,8 @@
       const equiposCalendario = document.getElementById('equiposCalendario');
       const listaEquipos = document.getElementById('listaEquipos');
       const iMantenimientoId = document.getElementById('iMantenimientoId');
-      const iEquipoCodigo = document.getElementById('iEquipoCodigo');
-      const iModulos = document.getElementById('iModulos');
+      const iEquipoProgramado = document.getElementById('iEquipoProgramado');
+      const iModulosChecklist = document.getElementById('iModulosChecklist');
       const iObservaciones = document.getElementById('iObservaciones');
       const iPendientes = document.getElementById('iPendientes');
       const iRecomendaciones = document.getElementById('iRecomendaciones');
@@ -602,10 +683,13 @@
       const btnInformeGuardar = document.getElementById('btnInformeGuardar');
       const btnInformeListar = document.getElementById('btnInformeListar');
       const informeStatus = document.getElementById('informeStatus');
+      const informeDetalleTexto = document.getElementById('informeDetalleTexto');
       const listaInformes = document.getElementById('listaInformes');
       let currentRutaNumero = '';
       let availableModulos = [];
+      let equiposProgramados = [];
       let activeSpec = '';
+      let currentInformeItems = [];
 
       function showSpecMenu() {
         activeSpec = '';
@@ -650,6 +734,15 @@
         const calendario = data?.calendario || null;
         const equipos = Array.isArray(data?.equipos) ? data.equipos : [];
         const mensaje = String(data?.mensaje || 'Consulta ejecutada.');
+        equiposProgramados = equipos;
+
+        iEquipoProgramado.innerHTML = '<option value="">Selecciona equipo programado del dia</option>';
+        equipos.forEach((equipo) => {
+          const option = document.createElement('option');
+          option.value = String(equipo.idEquipo || '').trim().toUpperCase();
+          option.textContent = `${equipo.idEquipo} · ${equipo.nombreEquipo}`;
+          iEquipoProgramado.appendChild(option);
+        });
 
         if (calendario) {
           equiposCalendario.textContent = `Fecha: ${calendario.dateIso} | Dia habil: ${calendario.isBusinessDay ? 'SI' : 'NO'} | Indice habil: ${calendario.businessDayIndex}`;
@@ -760,7 +853,7 @@
 
         fModulo.innerHTML = '<option value="">Todos los modulos</option>';
         cModulo.innerHTML = '<option value="">Selecciona modulo*</option>';
-        iModulos.innerHTML = '';
+        iModulosChecklist.innerHTML = '';
 
         unique.forEach((modulo) => {
           const filterOption = document.createElement('option');
@@ -773,15 +866,37 @@
           createOption.textContent = modulo;
           cModulo.appendChild(createOption);
 
-          const informeOption = document.createElement('option');
-          informeOption.value = modulo;
-          informeOption.textContent = modulo;
-          iModulos.appendChild(informeOption);
+          const wrap = document.createElement('label');
+          wrap.className = 'check-item';
+
+          const check = document.createElement('input');
+          check.type = 'checkbox';
+          check.value = modulo;
+          check.dataset.role = 'informe-modulo';
+          check.addEventListener('change', () => {
+            const selected = getSelectedInformeModulos();
+            if (selected.length > 3) {
+              check.checked = false;
+              setStatus(informeStatus, 'Solo puedes seleccionar hasta 3 modulos.', 'error');
+            } else {
+              setStatus(informeStatus, `Modulos seleccionados: ${selected.length}/3.`, 'ok');
+            }
+          });
+
+          const text = document.createElement('span');
+          text.textContent = modulo;
+
+          wrap.appendChild(check);
+          wrap.appendChild(text);
+          iModulosChecklist.appendChild(wrap);
         });
       }
 
       function getSelectedInformeModulos() {
-        return Array.from(iModulos.selectedOptions).map((option) => option.value.trim()).filter(Boolean);
+        return Array.from(iModulosChecklist.querySelectorAll('input[data-role="informe-modulo"]'))
+          .filter((item) => item.checked)
+          .map((item) => String(item.value || '').trim())
+          .filter(Boolean);
       }
 
       function buildInformePayload(includeObservaciones) {
@@ -794,10 +909,10 @@
           payload.mantenimientoId = mantenimientoId;
         }
 
-        const equipoCodigo = String(iEquipoCodigo.value || '').trim().toUpperCase();
+        const equipoCodigo = String(iEquipoProgramado.value || '').trim().toUpperCase();
         if (equipoCodigo) {
           payload.equipoCodigo = equipoCodigo;
-          iEquipoCodigo.value = equipoCodigo;
+          iEquipoProgramado.value = equipoCodigo;
         }
 
         if (includeObservaciones) {
@@ -810,27 +925,76 @@
       }
 
       function renderInformes(items) {
+        currentInformeItems = Array.isArray(items) ? items : [];
+
         if (!Array.isArray(items) || !items.length) {
           listaInformes.innerHTML = '<div class="small-note">No hay informes registrados.</div>';
+          informeDetalleTexto.value = '';
           return;
         }
 
         listaInformes.innerHTML = items
-          .slice(0, 15)
           .map((item) => {
             const modulos = Array.isArray(item.modulos) ? item.modulos.join(', ') : '-';
+            const equipoTag = item.equipoCodigo && item.equipoNombre
+              ? `${item.equipoCodigo} - ${item.equipoNombre}`
+              : (item.equipoCodigo || item.equipoNombre || `Equipo ID: ${item.equipoId ?? '-'}`);
             return `
-              <article class="item">
+              <article class="item" data-action="open-informe" data-id="${item.id}" style="cursor:pointer;">
                 <div class="item-head">
                   <strong>Informe #${item.id}</strong>
                   <span class="badge pendiente">${item.fechaGeneracion || '-'}</span>
                 </div>
-                <div class="meta">Mantenimiento: ${item.mantenimientoId ?? '-'} | Equipo ID: ${item.equipoId ?? '-'}</div>
+                <div class="meta">Mantenimiento: ${item.mantenimientoId ?? '-'} | Equipo: ${equipoTag}</div>
                 <div class="meta">Modulos: ${modulos}</div>
               </article>
             `;
           })
           .join('');
+
+        listaInformes.querySelectorAll('[data-action="open-informe"]').forEach((card) => {
+          card.addEventListener('click', () => {
+            const id = Number(card.dataset.id || 0);
+            const item = currentInformeItems.find((informe) => Number(informe.id) === id);
+            if (!item) {
+              return;
+            }
+
+            renderInformeDetalle(item);
+          });
+        });
+
+        renderInformeDetalle(items[0]);
+      }
+
+      function selectInformesByEquipo(items) {
+        if (!Array.isArray(items) || !items.length) {
+          return [];
+        }
+
+        const selectedCode = String(iEquipoProgramado.value || '').trim().toUpperCase();
+        if (selectedCode) {
+          return items.filter((item) => String(item.equipoCodigo || '').trim().toUpperCase() === selectedCode);
+        }
+
+        return items;
+      }
+
+      function renderInformeDetalle(item) {
+        if (!item) {
+          informeDetalleTexto.value = '';
+          return;
+        }
+
+        const pendientes = String(item.pendientes || '').trim();
+        const recomendaciones = String(item.recomendaciones || '').trim();
+        const blocks = [
+          String(item.observaciones || '').trim(),
+          pendientes ? `Pendientes:\n${pendientes}` : '',
+          recomendaciones ? `Recomendaciones:\n${recomendaciones}` : '',
+        ].filter(Boolean);
+
+        informeDetalleTexto.value = blocks.join('\n\n');
       }
 
       async function loadInformes() {
@@ -841,8 +1005,17 @@
             throw new Error('No fue posible cargar informes.');
           }
 
-          renderInformes(Array.isArray(data) ? data : []);
-          setStatus(informeStatus, `Informes cargados: ${(Array.isArray(data) ? data.length : 0)}.`, 'ok');
+          const all = Array.isArray(data) ? data : [];
+          const filtered = selectInformesByEquipo(all);
+          renderInformes(filtered);
+
+          if (filtered.length) {
+            setStatus(informeStatus, `Historial cargado: ${filtered.length} informe(s).`, 'ok');
+          } else if (String(iEquipoProgramado.value || '').trim()) {
+            setStatus(informeStatus, 'No hay informe guardado para el equipo seleccionado.', 'error');
+          } else {
+            setStatus(informeStatus, 'No hay informes registrados.', 'error');
+          }
         } catch (error) {
           setStatus(informeStatus, error.message || 'Error cargando informes.', 'error');
         }
@@ -855,11 +1028,16 @@
           return;
         }
 
+        if (!String(payload.equipoCodigo || '').trim()) {
+          setStatus(informeStatus, 'Debes seleccionar un equipo programado del dia.', 'error');
+          return;
+        }
+
         try {
           setStatus(informeStatus, 'Generando borrador de informe...', '');
           const response = await fetch('/informes/preview', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildRutaHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload),
           });
           const data = await response.json().catch(() => ({}));
@@ -887,6 +1065,11 @@
           return;
         }
 
+        if (!String(payload.equipoCodigo || '').trim()) {
+          setStatus(informeStatus, 'Debes seleccionar un equipo programado del dia.', 'error');
+          return;
+        }
+
         if (!String(payload.observaciones || '').trim()) {
           setStatus(informeStatus, 'El texto del informe no puede estar vacio.', 'error');
           return;
@@ -896,7 +1079,7 @@
           setStatus(informeStatus, 'Guardando informe...', '');
           const response = await fetch('/informes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildRutaHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload),
           });
           const data = await response.json().catch(() => ({}));
@@ -1269,13 +1452,17 @@
         equiposCalendario.textContent = 'Calendario pendiente de consulta.';
         listaEquipos.innerHTML = '';
         iMantenimientoId.value = '';
-        iEquipoCodigo.value = '';
+        iEquipoProgramado.value = '';
+        iEquipoProgramado.innerHTML = '<option value="">Selecciona equipo programado del dia</option>';
         iObservaciones.value = '';
         iPendientes.value = '';
         iRecomendaciones.value = '';
-        Array.from(iModulos.options).forEach((option) => {
-          option.selected = false;
+        Array.from(iModulosChecklist.querySelectorAll('input[data-role="informe-modulo"]')).forEach((item) => {
+          item.checked = false;
         });
+        equiposProgramados = [];
+        currentInformeItems = [];
+        informeDetalleTexto.value = '';
         listaInformes.innerHTML = '';
         setStatus(informeStatus, '', '');
         showLogin();
