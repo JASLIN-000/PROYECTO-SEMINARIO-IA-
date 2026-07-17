@@ -219,6 +219,10 @@
         gap: 12px;
       }
 
+      .layout.single {
+        grid-template-columns: 1fr;
+      }
+
       .panel {
         border: 1px solid #e6e9ef;
         border-radius: 12px;
@@ -328,6 +332,26 @@
         color: var(--muted);
       }
 
+      .menu-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .menu-card {
+        border: 1px solid #e6e9ef;
+        border-radius: 12px;
+        padding: 14px;
+        background: #fff;
+        display: grid;
+        gap: 10px;
+      }
+
+      .menu-card h3 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
       .report-text {
         min-height: 160px;
       }
@@ -353,6 +377,10 @@
         }
 
         .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .menu-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -381,14 +409,38 @@
       <section id="hallazgosScreen" class="screen hallazgos-screen hidden">
         <div class="topbar">
           <div>
-            <h2>Gestion de Hallazgos (SPEC1)</h2>
+            <h2 id="screenTitle">Seleccion de Modulo de Prueba</h2>
             <p id="userInfo" class="sub"></p>
           </div>
-          <button id="logoutButton" class="ghost" style="padding:0 14px;">Cerrar sesion</button>
+          <div class="item-actions">
+            <button id="backToMenuButton" class="ghost hidden" style="padding:0 14px;">Menu SPEC</button>
+            <button id="logoutButton" class="ghost" style="padding:0 14px;">Cerrar sesion</button>
+          </div>
         </div>
 
-        <div class="layout">
-          <section class="panel">
+        <section id="specMenuView" class="panel">
+          <h3>Primera visual: selecciona que SPEC quieres probar</h3>
+          <div class="menu-grid">
+            <article class="menu-card">
+              <h3>SPEC1 · Hallazgos</h3>
+              <p class="small-note">Consultar, filtrar, crear y actualizar estados de hallazgos.</p>
+              <button id="goSpec1" class="cta" type="button">Probar SPEC1</button>
+            </article>
+            <article class="menu-card">
+              <h3>SPEC2 · Equipos</h3>
+              <p class="small-note">Consultar programacion por ruta y fecha habil.</p>
+              <button id="goSpec2" class="cta" type="button">Probar SPEC2</button>
+            </article>
+            <article class="menu-card">
+              <h3>SPEC3 · Informes</h3>
+              <p class="small-note">Generar, editar y guardar informes de mantenimiento.</p>
+              <button id="goSpec3" class="cta" type="button">Probar SPEC3</button>
+            </article>
+          </div>
+        </section>
+
+        <div id="specLayout" class="layout hidden">
+          <section id="spec1ControlsPanel" class="panel hidden">
             <h3>Consultar y filtrar</h3>
             <div class="grid-2">
               <input id="fEquipoId" type="text" placeholder="ID equipo (ej: 068S-01)" />
@@ -443,8 +495,8 @@
             <div id="crudStatus" class="status" role="status" aria-live="polite"></div>
           </section>
 
-          <section class="stack">
-            <section class="panel">
+          <section id="specStack" class="stack">
+            <section id="spec2Panel" class="panel hidden">
               <h3>Consulta de Equipos (SPEC2)</h3>
               <div class="grid-2">
                 <input id="eqRuta" type="text" placeholder="Ruta (ej: 15)" />
@@ -459,12 +511,12 @@
               <div id="listaEquipos" class="list"></div>
             </section>
 
-            <section class="panel">
+            <section id="spec1ListPanel" class="panel hidden">
               <h3>Listado Hallazgos (SPEC1)</h3>
               <div id="listaHallazgos" class="list"></div>
             </section>
 
-            <section class="panel">
+            <section id="spec3Panel" class="panel hidden">
               <h3>Generacion de Informes (SPEC3)</h3>
               <div class="grid-2">
                 <input id="iMantenimientoId" type="number" min="1" placeholder="Mantenimiento ID (opcional)" />
@@ -502,7 +554,18 @@
       const loginStatus = document.getElementById('loginStatus');
       const crudStatus = document.getElementById('crudStatus');
       const userInfo = document.getElementById('userInfo');
+      const screenTitle = document.getElementById('screenTitle');
       const logoutButton = document.getElementById('logoutButton');
+      const backToMenuButton = document.getElementById('backToMenuButton');
+      const goSpec1 = document.getElementById('goSpec1');
+      const goSpec2 = document.getElementById('goSpec2');
+      const goSpec3 = document.getElementById('goSpec3');
+      const specMenuView = document.getElementById('specMenuView');
+      const specLayout = document.getElementById('specLayout');
+      const spec1ControlsPanel = document.getElementById('spec1ControlsPanel');
+      const spec1ListPanel = document.getElementById('spec1ListPanel');
+      const spec2Panel = document.getElementById('spec2Panel');
+      const spec3Panel = document.getElementById('spec3Panel');
       const listaHallazgos = document.getElementById('listaHallazgos');
 
       const fEquipoId = document.getElementById('fEquipoId');
@@ -542,6 +605,46 @@
       const listaInformes = document.getElementById('listaInformes');
       let currentRutaNumero = '';
       let availableModulos = [];
+      let activeSpec = '';
+
+      function showSpecMenu() {
+        activeSpec = '';
+        screenTitle.textContent = 'Seleccion de Modulo de Prueba';
+        backToMenuButton.classList.add('hidden');
+        specMenuView.classList.remove('hidden');
+        specLayout.classList.add('hidden');
+      }
+
+      function openSpec(specId) {
+        activeSpec = specId;
+        specMenuView.classList.add('hidden');
+        specLayout.classList.remove('hidden');
+        backToMenuButton.classList.remove('hidden');
+
+        spec1ControlsPanel.classList.add('hidden');
+        spec1ListPanel.classList.add('hidden');
+        spec2Panel.classList.add('hidden');
+        spec3Panel.classList.add('hidden');
+
+        if (specId === 'spec1') {
+          screenTitle.textContent = 'Pantalla SPEC1 · Gestion de Hallazgos';
+          specLayout.classList.remove('single');
+          spec1ControlsPanel.classList.remove('hidden');
+          spec1ListPanel.classList.remove('hidden');
+          return;
+        }
+
+        specLayout.classList.add('single');
+
+        if (specId === 'spec2') {
+          screenTitle.textContent = 'Pantalla SPEC2 · Consulta de Equipos';
+          spec2Panel.classList.remove('hidden');
+          return;
+        }
+
+        screenTitle.textContent = 'Pantalla SPEC3 · Generacion de Informes';
+        spec3Panel.classList.remove('hidden');
+      }
 
       function renderEquipos(data) {
         const calendario = data?.calendario || null;
@@ -581,6 +684,7 @@
               return;
             }
 
+            openSpec('spec1');
             fEquipoId.value = equipoId;
             fNombreEquipo.value = '';
             fEstado.value = '';
@@ -844,6 +948,7 @@
         loginScreen.classList.add('hidden');
         hallazgosScreen.classList.remove('hidden');
         userInfo.textContent = userText;
+        showSpecMenu();
       }
 
       function setLoginLoading(isLoading) {
@@ -1150,9 +1255,14 @@
       btnInformePreview.addEventListener('click', previewInforme);
       btnInformeGuardar.addEventListener('click', guardarInforme);
       btnInformeListar.addEventListener('click', loadInformes);
+      goSpec1.addEventListener('click', () => openSpec('spec1'));
+      goSpec2.addEventListener('click', () => openSpec('spec2'));
+      goSpec3.addEventListener('click', () => openSpec('spec3'));
+      backToMenuButton.addEventListener('click', showSpecMenu);
 
       logoutButton.addEventListener('click', () => {
         currentRutaNumero = '';
+        activeSpec = '';
         eqRuta.value = '';
         eqFecha.value = '';
         setStatus(equiposStatus, '', '');
