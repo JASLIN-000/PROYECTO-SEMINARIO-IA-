@@ -62,43 +62,24 @@ export class InformesService {
     const draft = await this.buildDraft(body, rutaNumero);
     const observaciones = body.observaciones?.trim() || draft.textoGenerado || 'Informe sin plantilla asociada';
 
-    const existing = await this.findExistingInforme(draft.equipoId, draft.mantenimientoId);
-    const entity = existing ?? this.informesRepository.create();
-
-    entity.mantenimientoId = draft.mantenimientoId;
-    entity.equipoId = draft.equipoId;
-    entity.modulosText = JSON.stringify(draft.modulos);
-    entity.observaciones = observaciones;
-    entity.pendientes = this.normalizeOptionalText(body.pendientes);
-    entity.recomendaciones = this.normalizeOptionalText(body.recomendaciones);
-    entity.fechaGeneracion = new Date();
+    const entity = this.informesRepository.create({
+      mantenimientoId: draft.mantenimientoId,
+      equipoId: draft.equipoId,
+      modulosText: JSON.stringify(draft.modulos),
+      observaciones,
+      pendientes: this.normalizeOptionalText(body.pendientes),
+      recomendaciones: this.normalizeOptionalText(body.recomendaciones),
+      fechaGeneracion: new Date(),
+    });
 
     const saved = await this.informesRepository.save(entity);
     const [response] = await this.enrichInformesResponse([saved]);
 
     return {
       ...response,
-      accion: existing ? 'actualizado' : 'creado',
+      accion: 'creado',
       resumenHallazgos: draft.resumenHallazgos,
     };
-  }
-
-  private async findExistingInforme(equipoId: number | null, mantenimientoId: number | null) {
-    if (!equipoId) {
-      return null;
-    }
-
-    const query = this.informesRepository
-      .createQueryBuilder('informe')
-      .where('informe.equipoId = :equipoId', { equipoId });
-
-    if (mantenimientoId) {
-      query.andWhere('informe.mantenimientoId = :mantenimientoId', { mantenimientoId });
-    } else {
-      query.andWhere('informe.mantenimientoId IS NULL');
-    }
-
-    return query.orderBy('informe.fechaGeneracion', 'DESC').getOne();
   }
 
   private async buildDraft(body: CreateInformeDto, rutaNumero?: string) {
