@@ -973,11 +973,11 @@
         }
 
         const selectedCode = String(iEquipoProgramado.value || '').trim().toUpperCase();
-        if (selectedCode) {
-          return items.filter((item) => String(item.equipoCodigo || '').trim().toUpperCase() === selectedCode);
+        if (!selectedCode) {
+          return [];
         }
 
-        return items;
+        return items.filter((item) => String(item.equipoCodigo || '').trim().toUpperCase() === selectedCode);
       }
 
       function renderInformeDetalle(item) {
@@ -1438,6 +1438,7 @@
       btnInformePreview.addEventListener('click', previewInforme);
       btnInformeGuardar.addEventListener('click', guardarInforme);
       btnInformeListar.addEventListener('click', loadInformes);
+      iEquipoProgramado.addEventListener('change', loadInformes);
       goSpec1.addEventListener('click', () => openSpec('spec1'));
       goSpec2.addEventListener('click', () => openSpec('spec2'));
       goSpec3.addEventListener('click', () => openSpec('spec3'));
