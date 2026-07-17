@@ -20,6 +20,11 @@ export class CreateInformeDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
+  equipoCodigo?: string = '';
+
+  @IsOptional()
+  @IsString()
   @MaxLength(100)
   modulo?: string = '';
 

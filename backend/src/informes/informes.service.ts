@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateInformeDto } from '../common/dto/create-informe.dto';
+import { Equipo } from '../common/entities/equipo.entity';
+import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Informe } from '../common/entities/informe.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
 
@@ -31,6 +33,10 @@ export class InformesService {
     private readonly informesRepository: Repository<Informe>,
     @InjectRepository(Plantilla)
     private readonly plantillasRepository: Repository<Plantilla>,
+    @InjectRepository(Hallazgo)
+    private readonly hallazgosRepository: Repository<Hallazgo>,
+    @InjectRepository(Equipo)
+    private readonly equiposRepository: Repository<Equipo>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -44,18 +50,21 @@ export class InformesService {
     return informes.map((informe) => this.toResponse(informe));
   }
 
+  async preview(body: CreateInformeDto) {
+    await this.ensureSchema();
+    return this.buildDraft(body);
+  }
+
   async create(body: CreateInformeDto) {
     await this.ensureSchema();
 
-    const modulos = this.normalizeModules(body);
-    const plantillas = await this.loadPlantillas(modulos);
-    const textoPlantillas = this.composeTemplateText(plantillas);
-    const observaciones = body.observaciones?.trim() || textoPlantillas || 'Informe sin plantilla asociada';
+    const draft = await this.buildDraft(body);
+    const observaciones = body.observaciones?.trim() || draft.textoGenerado || 'Informe sin plantilla asociada';
 
     const informe = this.informesRepository.create({
-      mantenimientoId: this.normalizeOptionalNumber(body.mantenimientoId),
-      equipoId: this.normalizeOptionalNumber(body.equipoId),
-      modulosText: JSON.stringify(modulos),
+      mantenimientoId: draft.mantenimientoId,
+      equipoId: draft.equipoId,
+      modulosText: JSON.stringify(draft.modulos),
       observaciones,
       pendientes: this.normalizeOptionalText(body.pendientes),
       recomendaciones: this.normalizeOptionalText(body.recomendaciones),
@@ -63,7 +72,52 @@ export class InformesService {
     });
 
     const saved = await this.informesRepository.save(informe);
-    return this.toResponse(saved);
+    return {
+      ...this.toResponse(saved),
+      resumenHallazgos: draft.resumenHallazgos,
+    };
+  }
+
+  private async buildDraft(body: CreateInformeDto) {
+    const modulos = this.normalizeModules(body);
+    const mantenimientoId = this.normalizeOptionalNumber(body.mantenimientoId);
+    const equipoId = await this.resolveEquipoId(body.equipoId, body.equipoCodigo);
+    const equipo = equipoId
+      ? await this.equiposRepository.findOne({ where: { id: equipoId } })
+      : null;
+
+    const plantillas = await this.loadPlantillas(modulos);
+    const textoPlantillas = this.composeTemplateText(plantillas);
+    const hallazgos = await this.loadHallazgosForDraft(equipoId, mantenimientoId);
+    const seccionHallazgos = this.composeHallazgosSection(hallazgos);
+    const intro = this.composeIntro(mantenimientoId, equipo);
+
+    const blocks = [
+      intro,
+      textoPlantillas || 'No existe plantilla para alguno de los modulos seleccionados. Redaccion manual habilitada.',
+      seccionHallazgos,
+    ].filter(Boolean);
+
+    return {
+      mantenimientoId,
+      equipoId,
+      equipo: equipo
+        ? {
+            id: equipo.id,
+            idEquipo: equipo.idEquipo,
+            nombreEquipo: equipo.nombreEquipo,
+            rutaNumero: equipo.rutaNumero,
+          }
+        : null,
+      modulos,
+      textoGenerado: blocks.join('\n\n'),
+      resumenHallazgos: {
+        total: hallazgos.length,
+        abiertos: hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'ABIERTO').length,
+        pendientes: hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'PENDIENTE').length,
+        solucionados: hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'SOLUCIONADO').length,
+      },
+    };
   }
 
   private async ensureSchema() {
@@ -105,6 +159,37 @@ export class InformesService {
       .where('LOWER(plantilla.modulo) IN (:...modulos)', { modulos: normalized })
       .orderBy('plantilla.modulo', 'ASC')
       .getMany();
+  }
+
+  private async loadHallazgosForDraft(equipoId: number | null, mantenimientoId: number | null) {
+    const fromDate = this.getIsoDateMonthsAgo(5);
+    const byId = new Map<number, Hallazgo>();
+
+    if (mantenimientoId) {
+      const current = await this.hallazgosRepository.find({
+        where: { mantenimientoId },
+        order: { fechaHallazgo: 'DESC' },
+      });
+
+      current.forEach((item) => {
+        byId.set(item.id, item);
+      });
+    }
+
+    if (equipoId) {
+      const history = await this.hallazgosRepository
+        .createQueryBuilder('hallazgo')
+        .where('hallazgo.equipoId = :equipoId', { equipoId })
+        .andWhere('hallazgo.fechaHallazgo >= :fromDate', { fromDate })
+        .orderBy('hallazgo.fechaHallazgo', 'DESC')
+        .getMany();
+
+      history.forEach((item) => {
+        byId.set(item.id, item);
+      });
+    }
+
+    return Array.from(byId.values()).sort((a, b) => String(b.fechaHallazgo).localeCompare(String(a.fechaHallazgo)));
   }
 
   private normalizeModules(body: CreateInformeDto) {
@@ -149,6 +234,21 @@ export class InformesService {
     return Array.from(uniqueModules.values());
   }
 
+  private composeIntro(mantenimientoId: number | null, equipo: Equipo | null) {
+    const scope: string[] = [];
+
+    if (mantenimientoId) {
+      scope.push(`Mantenimiento #${mantenimientoId}`);
+    }
+
+    if (equipo) {
+      scope.push(`Equipo ${equipo.idEquipo} - ${equipo.nombreEquipo}`);
+    }
+
+    const scopeText = scope.length ? ` (${scope.join(' | ')})` : '';
+    return `Informe tecnico generado${scopeText}. Este texto puede editarse por completo antes de guardar.`;
+  }
+
   private composeTemplateText(plantillas: Plantilla[]) {
     if (!plantillas.length) {
       return '';
@@ -162,6 +262,79 @@ export class InformesService {
       .join('\n\n');
   }
 
+  private composeHallazgosSection(hallazgos: Hallazgo[]) {
+    if (!hallazgos.length) {
+      return '';
+    }
+
+    const abiertos = hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'ABIERTO');
+    const pendientes = hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'PENDIENTE');
+    const solucionados = hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'SOLUCIONADO');
+
+    const sectionBlocks = [
+      this.composeHallazgoSubsection('Hallazgos abiertos', abiertos),
+      this.composeHallazgoSubsection('Hallazgos pendientes', pendientes),
+      this.composeHallazgoSubsection('Hallazgos solucionados', solucionados),
+    ].filter(Boolean);
+
+    if (!sectionBlocks.length) {
+      return '';
+    }
+
+    return `Seccion de hallazgos (mantenimiento actual y ultimos 5 meses):\n\n${sectionBlocks.join('\n\n')}`;
+  }
+
+  private composeHallazgoSubsection(title: string, hallazgos: Hallazgo[]) {
+    if (!hallazgos.length) {
+      return '';
+    }
+
+    const lines = hallazgos.map((item) => {
+      const modulo = item.modulo || '-';
+      const descripcion = item.descripcionHallazgo || 'Sin descripcion';
+      const fecha = item.fechaHallazgo || '-';
+      return `- [${fecha}] (${modulo}) ${descripcion}`;
+    });
+
+    return `${title}:\n${lines.join('\n')}`;
+  }
+
+  private normalizeEstado(value: string | null | undefined) {
+    const estado = String(value || '').trim().toUpperCase();
+    if (estado === 'CERRADO') {
+      return 'SOLUCIONADO';
+    }
+
+    if (estado === 'PENDIENTE' || estado === 'SOLUCIONADO' || estado === 'ABIERTO') {
+      return estado;
+    }
+
+    return 'ABIERTO';
+  }
+
+  private async resolveEquipoId(equipoId?: number, equipoCodigo?: string) {
+    const normalizedId = this.normalizeOptionalNumber(equipoId);
+    if (normalizedId) {
+      return normalizedId;
+    }
+
+    const code = String(equipoCodigo || '').trim().toUpperCase();
+    if (!code) {
+      return null;
+    }
+
+    const equipo = await this.equiposRepository
+      .createQueryBuilder('equipo')
+      .where('LOWER(equipo.idEquipo) = :codigo', { codigo: code.toLowerCase() })
+      .getOne();
+
+    if (!equipo) {
+      throw new BadRequestException(`No existe equipo con codigo ${code}.`);
+    }
+
+    return equipo.id;
+  }
+
   private normalizeOptionalText(value?: string) {
     const text = value?.trim();
     return text ? text : null;
@@ -169,6 +342,12 @@ export class InformesService {
 
   private normalizeOptionalNumber(value?: number) {
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  private getIsoDateMonthsAgo(months: number) {
+    const date = new Date();
+    date.setUTCMonth(date.getUTCMonth() - months);
+    return date.toISOString().slice(0, 10);
   }
 
   private toResponse(informe: Informe) {

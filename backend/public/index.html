@@ -328,6 +328,10 @@
         color: var(--muted);
       }
 
+      .report-text {
+        min-height: 160px;
+      }
+
       @keyframes spin {
         to {
           transform: rotate(360deg);
@@ -459,6 +463,28 @@
               <h3>Listado Hallazgos (SPEC1)</h3>
               <div id="listaHallazgos" class="list"></div>
             </section>
+
+            <section class="panel">
+              <h3>Generacion de Informes (SPEC3)</h3>
+              <div class="grid-2">
+                <input id="iMantenimientoId" type="number" min="1" placeholder="Mantenimiento ID (opcional)" />
+                <input id="iEquipoCodigo" type="text" placeholder="Codigo equipo (ej: 4333S-01)" />
+              </div>
+              <select id="iModulos" multiple size="6"></select>
+              <p class="small-note">Selecciona entre 1 y 3 modulos para generar el borrador.</p>
+              <textarea id="iObservaciones" class="report-text" placeholder="Texto del informe editable"></textarea>
+              <div class="grid-2">
+                <textarea id="iPendientes" placeholder="Pendientes"></textarea>
+                <textarea id="iRecomendaciones" placeholder="Recomendaciones"></textarea>
+              </div>
+              <div class="grid-2">
+                <button id="btnInformePreview" class="ghost" type="button">Generar borrador</button>
+                <button id="btnInformeGuardar" class="cta" type="button">Guardar informe</button>
+              </div>
+              <button id="btnInformeListar" class="ghost" type="button">Recargar informes</button>
+              <div id="informeStatus" class="status" role="status" aria-live="polite"></div>
+              <div id="listaInformes" class="list"></div>
+            </section>
           </section>
         </div>
       </section>
@@ -503,6 +529,17 @@
       const equiposStatus = document.getElementById('equiposStatus');
       const equiposCalendario = document.getElementById('equiposCalendario');
       const listaEquipos = document.getElementById('listaEquipos');
+      const iMantenimientoId = document.getElementById('iMantenimientoId');
+      const iEquipoCodigo = document.getElementById('iEquipoCodigo');
+      const iModulos = document.getElementById('iModulos');
+      const iObservaciones = document.getElementById('iObservaciones');
+      const iPendientes = document.getElementById('iPendientes');
+      const iRecomendaciones = document.getElementById('iRecomendaciones');
+      const btnInformePreview = document.getElementById('btnInformePreview');
+      const btnInformeGuardar = document.getElementById('btnInformeGuardar');
+      const btnInformeListar = document.getElementById('btnInformeListar');
+      const informeStatus = document.getElementById('informeStatus');
+      const listaInformes = document.getElementById('listaInformes');
       let currentRutaNumero = '';
       let availableModulos = [];
 
@@ -619,6 +656,7 @@
 
         fModulo.innerHTML = '<option value="">Todos los modulos</option>';
         cModulo.innerHTML = '<option value="">Selecciona modulo*</option>';
+        iModulos.innerHTML = '';
 
         unique.forEach((modulo) => {
           const filterOption = document.createElement('option');
@@ -630,7 +668,144 @@
           createOption.value = modulo;
           createOption.textContent = modulo;
           cModulo.appendChild(createOption);
+
+          const informeOption = document.createElement('option');
+          informeOption.value = modulo;
+          informeOption.textContent = modulo;
+          iModulos.appendChild(informeOption);
         });
+      }
+
+      function getSelectedInformeModulos() {
+        return Array.from(iModulos.selectedOptions).map((option) => option.value.trim()).filter(Boolean);
+      }
+
+      function buildInformePayload(includeObservaciones) {
+        const payload = {
+          modulos: getSelectedInformeModulos(),
+        };
+
+        const mantenimientoId = Number(iMantenimientoId.value || 0);
+        if (Number.isFinite(mantenimientoId) && mantenimientoId > 0) {
+          payload.mantenimientoId = mantenimientoId;
+        }
+
+        const equipoCodigo = String(iEquipoCodigo.value || '').trim().toUpperCase();
+        if (equipoCodigo) {
+          payload.equipoCodigo = equipoCodigo;
+          iEquipoCodigo.value = equipoCodigo;
+        }
+
+        if (includeObservaciones) {
+          payload.observaciones = iObservaciones.value.trim();
+          payload.pendientes = iPendientes.value.trim();
+          payload.recomendaciones = iRecomendaciones.value.trim();
+        }
+
+        return payload;
+      }
+
+      function renderInformes(items) {
+        if (!Array.isArray(items) || !items.length) {
+          listaInformes.innerHTML = '<div class="small-note">No hay informes registrados.</div>';
+          return;
+        }
+
+        listaInformes.innerHTML = items
+          .slice(0, 15)
+          .map((item) => {
+            const modulos = Array.isArray(item.modulos) ? item.modulos.join(', ') : '-';
+            return `
+              <article class="item">
+                <div class="item-head">
+                  <strong>Informe #${item.id}</strong>
+                  <span class="badge pendiente">${item.fechaGeneracion || '-'}</span>
+                </div>
+                <div class="meta">Mantenimiento: ${item.mantenimientoId ?? '-'} | Equipo ID: ${item.equipoId ?? '-'}</div>
+                <div class="meta">Modulos: ${modulos}</div>
+              </article>
+            `;
+          })
+          .join('');
+      }
+
+      async function loadInformes() {
+        try {
+          const response = await fetch('/informes');
+          const data = await response.json().catch(() => ([]));
+          if (!response.ok) {
+            throw new Error('No fue posible cargar informes.');
+          }
+
+          renderInformes(Array.isArray(data) ? data : []);
+          setStatus(informeStatus, `Informes cargados: ${(Array.isArray(data) ? data.length : 0)}.`, 'ok');
+        } catch (error) {
+          setStatus(informeStatus, error.message || 'Error cargando informes.', 'error');
+        }
+      }
+
+      async function previewInforme() {
+        const payload = buildInformePayload(false);
+        if (payload.modulos.length < 1 || payload.modulos.length > 3) {
+          setStatus(informeStatus, 'Debes seleccionar entre 1 y 3 modulos.', 'error');
+          return;
+        }
+
+        try {
+          setStatus(informeStatus, 'Generando borrador de informe...', '');
+          const response = await fetch('/informes/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = data?.message || 'No fue posible generar el borrador.';
+            throw new Error(Array.isArray(message) ? message.join(', ') : String(message));
+          }
+
+          iObservaciones.value = data?.textoGenerado || '';
+          const resumen = data?.resumenHallazgos || {};
+          setStatus(
+            informeStatus,
+            `Borrador generado. Hallazgos: total ${resumen.total ?? 0}, abiertos ${resumen.abiertos ?? 0}, pendientes ${resumen.pendientes ?? 0}, solucionados ${resumen.solucionados ?? 0}.`,
+            'ok',
+          );
+        } catch (error) {
+          setStatus(informeStatus, error.message || 'Error generando borrador.', 'error');
+        }
+      }
+
+      async function guardarInforme() {
+        const payload = buildInformePayload(true);
+        if (payload.modulos.length < 1 || payload.modulos.length > 3) {
+          setStatus(informeStatus, 'Debes seleccionar entre 1 y 3 modulos.', 'error');
+          return;
+        }
+
+        if (!String(payload.observaciones || '').trim()) {
+          setStatus(informeStatus, 'El texto del informe no puede estar vacio.', 'error');
+          return;
+        }
+
+        try {
+          setStatus(informeStatus, 'Guardando informe...', '');
+          const response = await fetch('/informes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = data?.message || 'No fue posible guardar el informe.';
+            throw new Error(Array.isArray(message) ? message.join(', ') : String(message));
+          }
+
+          setStatus(informeStatus, `Informe #${data.id} guardado correctamente.`, 'ok');
+          await loadInformes();
+        } catch (error) {
+          setStatus(informeStatus, error.message || 'Error guardando informe.', 'error');
+        }
       }
 
       async function loadModuloCatalog() {
@@ -955,6 +1130,7 @@
             equipos: data?.equipos,
           });
           await consultarHallazgos();
+          await loadInformes();
         } catch (error) {
           setStatus(loginStatus, error.message || 'Error inesperado en el inicio de sesion.', 'error');
         } finally {
@@ -971,6 +1147,9 @@
         eqFecha.value = '';
         consultarEquipos();
       });
+      btnInformePreview.addEventListener('click', previewInforme);
+      btnInformeGuardar.addEventListener('click', guardarInforme);
+      btnInformeListar.addEventListener('click', loadInformes);
 
       logoutButton.addEventListener('click', () => {
         currentRutaNumero = '';
@@ -979,6 +1158,16 @@
         setStatus(equiposStatus, '', '');
         equiposCalendario.textContent = 'Calendario pendiente de consulta.';
         listaEquipos.innerHTML = '';
+        iMantenimientoId.value = '';
+        iEquipoCodigo.value = '';
+        iObservaciones.value = '';
+        iPendientes.value = '';
+        iRecomendaciones.value = '';
+        Array.from(iModulos.options).forEach((option) => {
+          option.selected = false;
+        });
+        listaInformes.innerHTML = '';
+        setStatus(informeStatus, '', '');
         showLogin();
       });
     </script>

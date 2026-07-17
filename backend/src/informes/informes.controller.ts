@@ -11,6 +11,11 @@ export class InformesController {
     return this.informesService.findAll();
   }
 
+  @Post('preview')
+  preview(@Body() body: CreateInformeDto) {
+    return this.informesService.preview(body);
+  }
+
   @Post()
   create(@Body() body: CreateInformeDto) {
     return this.informesService.create(body);
