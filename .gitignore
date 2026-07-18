@@ -25,3 +25,7 @@ Thumbs.db
 
 # Editor settings
 .vscode/
+
+# Local runtime artifacts
+.runtime/
+backend/.runtime-*.sql

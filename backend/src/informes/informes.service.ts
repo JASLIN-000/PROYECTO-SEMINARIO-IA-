@@ -5,10 +5,11 @@ import { CreateInformeDto } from '../common/dto/create-informe.dto';
 import { Equipo } from '../common/entities/equipo.entity';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Informe } from '../common/entities/informe.entity';
+import { Modulo } from '../common/entities/modulo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
 import { getBusinessDayContext, getConfiguredHolidaySet } from '../common/utils/business-days';
 
-const ALLOWED_MODULES = [
+const DEFAULT_ALLOWED_MODULES = [
   'VERIFICACION DE SEGURIDAD Y CALIDAD',
   'LIMPIEZA L1',
   'LIMPIEZA L2',
@@ -23,8 +24,6 @@ const ALLOWED_MODULES = [
   'CAMBIO DE CABLES',
 ];
 
-const ALLOWED_MODULES_BY_KEY = new Map(ALLOWED_MODULES.map((moduleName) => [normalizeModuleKey(moduleName), moduleName]));
-
 @Injectable()
 export class InformesService {
   private schemaReady?: Promise<void>;
@@ -38,6 +37,8 @@ export class InformesService {
     private readonly hallazgosRepository: Repository<Hallazgo>,
     @InjectRepository(Equipo)
     private readonly equiposRepository: Repository<Equipo>,
+    @InjectRepository(Modulo)
+    private readonly modulosRepository: Repository<Modulo>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -83,7 +84,7 @@ export class InformesService {
   }
 
   private async buildDraft(body: CreateInformeDto, rutaNumero?: string) {
-    const modulos = this.normalizeModules(body);
+    const modulos = await this.normalizeModules(body);
     const mantenimientoId = this.normalizeOptionalNumber(body.mantenimientoId);
     const equipoId = await this.resolveEquipoId(body.equipoId, body.equipoCodigo, rutaNumero);
     const equipo = equipoId
@@ -124,7 +125,20 @@ export class InformesService {
 
   private async ensureSchema() {
     if (!this.schemaReady) {
+      const moduloInserts = DEFAULT_ALLOWED_MODULES.map(
+        (moduleName) =>
+          `INSERT INTO modulos (nombre_modulo) VALUES ('${moduleName.replace(/'/g, "''")}') ON CONFLICT (nombre_modulo) DO NOTHING;`,
+      ).join('\n');
+
       this.schemaReady = this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS modulos (
+          id BIGSERIAL PRIMARY KEY,
+          nombre_modulo VARCHAR(200) NOT NULL UNIQUE,
+          activo BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
         CREATE TABLE IF NOT EXISTS informes (
           id BIGSERIAL PRIMARY KEY,
           mantenimiento_id INTEGER NULL,
@@ -143,6 +157,8 @@ export class InformesService {
 
         CREATE INDEX IF NOT EXISTS idx_informes_fecha_generacion ON informes(fecha_generacion DESC);
         CREATE INDEX IF NOT EXISTS idx_informes_equipo_id ON informes(equipo_id);
+
+        ${moduloInserts}
       `).then(() => undefined);
     }
 
@@ -194,11 +210,13 @@ export class InformesService {
     return Array.from(byId.values()).sort((a, b) => String(b.fechaHallazgo).localeCompare(String(a.fechaHallazgo)));
   }
 
-  private normalizeModules(body: CreateInformeDto) {
+  private async normalizeModules(body: CreateInformeDto) {
     const rawModules = Array.isArray(body.modulos)
       ? body.modulos
       : [body.modulo].filter((value): value is string => typeof value === 'string');
 
+    const allowedModules = await this.getAllowedModulesCatalog();
+    const allowedOptions = Array.from(allowedModules.values());
     const uniqueModules = new Map<string, string>();
     const invalidModules: string[] = [];
 
@@ -207,7 +225,7 @@ export class InformesService {
       .filter(Boolean)
       .forEach((modulo) => {
         const key = normalizeModuleKey(modulo);
-        const allowedModule = ALLOWED_MODULES_BY_KEY.get(key);
+        const allowedModule = allowedModules.get(key);
 
         if (!allowedModule) {
           invalidModules.push(modulo);
@@ -221,12 +239,12 @@ export class InformesService {
 
     if (invalidModules.length) {
       throw new BadRequestException(
-        `Modulo(s) no permitido(s): ${invalidModules.join(', ')}. Solo se permiten: ${ALLOWED_MODULES.join(', ')}`,
+        `Modulo(s) no permitido(s): ${invalidModules.join(', ')}. Solo se permiten: ${allowedOptions.join(', ')}`,
       );
     }
 
     if (!uniqueModules.size) {
-      throw new BadRequestException(`Debes seleccionar al menos un modulo permitido. Opciones: ${ALLOWED_MODULES.join(', ')}`);
+      throw new BadRequestException(`Debes seleccionar al menos un modulo permitido. Opciones: ${allowedOptions.join(', ')}`);
     }
 
     if (uniqueModules.size > 3) {
@@ -234,6 +252,17 @@ export class InformesService {
     }
 
     return Array.from(uniqueModules.values());
+  }
+
+  private async getAllowedModulesCatalog() {
+    const rows = await this.modulosRepository
+      .createQueryBuilder('modulo')
+      .where('modulo.activo = :activo', { activo: true })
+      .orderBy('modulo.nombreModulo', 'ASC')
+      .getMany();
+
+    const source = rows.length ? rows.map((row) => row.nombreModulo) : DEFAULT_ALLOWED_MODULES;
+    return new Map(source.map((moduleName) => [normalizeModuleKey(moduleName), moduleName]));
   }
 
   private composeTemplateText(plantillas: Plantilla[]) {

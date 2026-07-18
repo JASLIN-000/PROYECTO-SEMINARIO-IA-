@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { CreateHallazgoDto } from '../common/dto/create-hallazgo.dto';
+import { UpdateHallazgoDto } from '../common/dto/update-hallazgo.dto';
 import { Equipo } from '../common/entities/equipo.entity';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
@@ -132,7 +134,42 @@ export class HallazgosService {
     }
   }
 
-  async create(body: any, rutaNumero?: string) {
+  async findEstadoHistorial(id: number) {
+    await this.ensureSchema();
+
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('El id de hallazgo es invalido.');
+    }
+
+    const exists = await this.hallazgosRepository.findOne({ where: { id } });
+    if (!exists) {
+      throw new NotFoundException('Hallazgo no encontrado.');
+    }
+
+    const rows = await this.dataSource.query(
+      `
+        SELECT
+          id,
+          hallazgo_id AS "hallazgoId",
+          estado_anterior AS "estadoAnterior",
+          estado_nuevo AS "estadoNuevo",
+          motivo,
+          fecha_cambio AS "fechaCambio"
+        FROM hallazgo_estado_historial
+        WHERE hallazgo_id = $1
+        ORDER BY fecha_cambio DESC, id DESC
+      `,
+      [id],
+    );
+
+    return {
+      hallazgoId: id,
+      totalCambios: rows.length,
+      historial: rows,
+    };
+  }
+
+  async create(body: CreateHallazgoDto, rutaNumero?: string) {
     await this.ensureSchema();
     const normalizedRoute = this.normalizeRoute(rutaNumero);
     const payload = await this.normalizeBusinessRules(body, false, normalizedRoute);
@@ -142,6 +179,7 @@ export class HallazgosService {
 
     try {
       const saved = await this.hallazgosRepository.save(payload);
+      await this.recordEstadoTransition(saved.id, null, saved.estado, 'CREATED');
       const [enriched] = await this.enrichWithEquipos([saved]);
       return enriched;
     } catch {
@@ -151,13 +189,19 @@ export class HallazgosService {
     }
   }
 
-  async update(id: number, body: any, rutaNumero?: string) {
+  async update(id: number, body: UpdateHallazgoDto, rutaNumero?: string) {
     await this.ensureSchema();
     const normalizedRoute = this.normalizeRoute(rutaNumero);
     const payload = await this.normalizeBusinessRules(body, true, normalizedRoute);
 
     try {
-      const hallazgo = await this.hallazgosRepository.preload({ id, ...payload });
+      const current = await this.hallazgosRepository.findOne({ where: { id } });
+      if (!current) {
+        return null;
+      }
+
+      const previousEstado = String(current.estado || '').trim().toUpperCase() || null;
+      const hallazgo = this.hallazgosRepository.merge(current, payload);
       if (!hallazgo) {
         return null;
       }
@@ -167,6 +211,10 @@ export class HallazgosService {
       }
 
       const saved = await this.hallazgosRepository.save(hallazgo);
+      const nextEstado = String(saved.estado || '').trim().toUpperCase() || null;
+      if (previousEstado !== nextEstado) {
+        await this.recordEstadoTransition(saved.id, previousEstado, nextEstado, 'UPDATED');
+      }
       const [enriched] = await this.enrichWithEquipos([saved]);
       return enriched;
     } catch (error) {
@@ -185,7 +233,7 @@ export class HallazgosService {
   }
 
   private async normalizeBusinessRules(
-    body: any,
+    body: CreateHallazgoDto | UpdateHallazgoDto,
     isPartial: boolean,
     rutaNumero?: string,
   ): Promise<any> {
@@ -289,9 +337,22 @@ export class HallazgosService {
       this.schemaReady = this.dataSource
         .query(`
           ALTER TABLE hallazgos ADD COLUMN IF NOT EXISTS mantenimiento_id INTEGER NULL;
+          ALTER TABLE hallazgos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+          ALTER TABLE hallazgos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
+
+          CREATE TABLE IF NOT EXISTS hallazgo_estado_historial (
+            id BIGSERIAL PRIMARY KEY,
+            hallazgo_id BIGINT NOT NULL REFERENCES hallazgos(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            estado_anterior VARCHAR(20) NULL,
+            estado_nuevo VARCHAR(20) NOT NULL,
+            motivo VARCHAR(60) NOT NULL,
+            fecha_cambio TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+
           CREATE INDEX IF NOT EXISTS idx_hallazgos_fecha_hallazgo ON hallazgos(fecha_hallazgo DESC);
           CREATE INDEX IF NOT EXISTS idx_hallazgos_modulo ON hallazgos(modulo);
           CREATE INDEX IF NOT EXISTS idx_hallazgos_mantenimiento_id ON hallazgos(mantenimiento_id);
+          CREATE INDEX IF NOT EXISTS idx_hallazgo_estado_historial_hallazgo_id ON hallazgo_estado_historial(hallazgo_id, fecha_cambio DESC);
         `)
         .then(() => undefined);
     }
@@ -499,5 +560,27 @@ export class HallazgosService {
       idEquipo: equipo?.idEquipo ?? hallazgo.idEquipo ?? null,
       nombreEquipo: equipo?.nombreEquipo ?? hallazgo.nombreEquipo ?? null,
     };
+  }
+
+  private async recordEstadoTransition(
+    hallazgoId: number,
+    estadoAnterior: string | null,
+    estadoNuevo: string | null,
+    motivo: 'CREATED' | 'UPDATED',
+  ) {
+    const normalizedNuevo = String(estadoNuevo || '').trim().toUpperCase();
+    if (!normalizedNuevo) {
+      return;
+    }
+
+    const normalizedAnterior = estadoAnterior ? String(estadoAnterior).trim().toUpperCase() : null;
+
+    await this.dataSource.query(
+      `
+        INSERT INTO hallazgo_estado_historial (hallazgo_id, estado_anterior, estado_nuevo, motivo)
+        VALUES ($1, $2, $3, $4)
+      `,
+      [hallazgoId, normalizedAnterior, normalizedNuevo, motivo],
+    );
   }
 }
