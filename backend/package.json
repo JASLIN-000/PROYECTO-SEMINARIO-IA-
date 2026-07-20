@@ -8,7 +8,8 @@
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "test": "jest"
+    "test": "jest",
+    "auth:list-users": "node ./scripts/list-auth-users.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

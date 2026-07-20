@@ -14,14 +14,13 @@ import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
 import {
   moveToNextBusinessDay,
-  parseHolidaySet,
+  loadConfiguredHolidaySet,
   toIsoDate,
 } from '../common/utils/business-days';
 
 @Injectable()
 export class HallazgosService {
   private static readonly EQUIPO_CODE_REGEX = /^\d{3,5}s-\d{2}$/i;
-  private readonly holidays = parseHolidaySet(process.env.HOLIDAYS);
   private readonly hallazgosFallback: Array<any> = [];
   private schemaReady?: Promise<void>;
 
@@ -304,9 +303,10 @@ export class HallazgosService {
     const hasDate = typeof rawFechaHallazgo === 'string' && rawFechaHallazgo.trim();
 
     if (hasDate) {
-      const parsed = new Date(`${rawFechaHallazgo}T00:00:00.000Z`);
+      const parsed = new Date(`${rawFechaHallazgo}T12:00:00-05:00`);
       if (!Number.isNaN(parsed.getTime())) {
-        const shifted = moveToNextBusinessDay(parsed, this.holidays);
+        const holidays = await loadConfiguredHolidaySet(parsed);
+        const shifted = moveToNextBusinessDay(parsed, holidays);
         normalized.fechaHallazgo = toIsoDate(shifted);
       }
     } else if (!isPartial) {
@@ -389,6 +389,20 @@ export class HallazgosService {
     const value = String(rawEquipoRef ?? '').trim();
     if (!value) {
       return NaN;
+    }
+
+    const numericId = Number(value);
+    if (Number.isInteger(numericId) && numericId > 0) {
+      const equipoById = await this.equiposRepository.findOne({ where: { id: numericId } });
+      if (!equipoById) {
+        throw new NotFoundException(`No existe equipo con id ${numericId}.`);
+      }
+
+      if (!this.belongsToRoute(equipoById.rutaNumero, rutaNumero)) {
+        throw new NotFoundException('Equipo no pertenece a la ruta.');
+      }
+
+      return equipoById.id;
     }
 
     const normalizedCode = this.normalizeEquipoCode(value);

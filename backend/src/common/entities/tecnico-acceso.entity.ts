@@ -5,6 +5,9 @@ export class TecnicoAcceso {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Column({ name: 'usuario', unique: true, length: 120 })
+  usuario!: string;
+
   @Column({ unique: true, length: 30 })
   cedula!: string;
 

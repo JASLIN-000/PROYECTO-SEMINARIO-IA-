@@ -44,8 +44,15 @@ Si la conexion es correcta, NestJS quedara escuchando por defecto en `http://loc
 
 ### Calendario de dias habiles
 
-El backend calcula los dias habiles con el calendario nacional de Colombia por defecto (`HOLIDAYS_COUNTRY=CO`) y excluye sabados y domingos.
+El backend calcula los dias habiles usando el calendario oficial de festivos de Colombia desde la API publica de Nager.Date y excluye sabados, domingos y feriados nacionales.
+Si la API no responde, el sistema reutiliza un cache local en `data/holidays-cache.json`; como ultimo respaldo, mantiene compatibilidad con `date-holidays`.
 Si necesitas añadir o reemplazar feriados manualmente, define `HOLIDAYS` con fechas ISO separadas por coma.
+
+Endpoint auxiliar para el frontend:
+
+- `GET http://localhost:3000/calendario/mes?fecha=YYYY-MM-DD`
+
+Responde con el contexto del dia habil y la lista de dias habiles del mes para poder recalcular el DH en la interfaz sin duplicar logica.
 
 ## Probar endpoints
 

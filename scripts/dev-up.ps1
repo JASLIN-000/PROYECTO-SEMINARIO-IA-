@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 function Get-PidsByPort {
   param([Parameter(Mandatory = $true)][int]$Port)
 
-  $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
+  $connections = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty OwningProcess -Unique
 
   if (-not $connections) {
@@ -58,20 +58,6 @@ function Wait-Http {
   return $false
 }
 
-function Resolve-PythonLauncher {
-  $python = Get-Command python -ErrorAction SilentlyContinue
-  if ($python) {
-    return 'python'
-  }
-
-  $py = Get-Command py -ErrorAction SilentlyContinue
-  if ($py) {
-    return 'py'
-  }
-
-  throw 'Python launcher was not found. Install Python or run frontend with another static server.'
-}
-
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $repoRoot 'backend'
 $frontendPath = Join-Path $repoRoot 'frontend'
@@ -88,20 +74,16 @@ if (-not (Test-Path $frontendPath)) {
 
 New-Item -Path $runtimeDir -ItemType Directory -Force | Out-Null
 
-Write-Host '[dev-up] Cleaning previous listeners on ports 3000 and 5173...'
+Write-Host '[dev-up] Cleaning previous listeners on ports 3000, 5173 and 5174...'
 Stop-PortListeners -Port 3000
 Stop-PortListeners -Port 5173
+Stop-PortListeners -Port 5174
 
 $backendCmd = "npm --prefix `"$backendPath`" run start:dev"
 $backendProc = Start-Process -FilePath 'powershell' -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $backendCmd -PassThru
 Write-Host "[dev-up] Backend launched. PID=$($backendProc.Id)"
 
-$pythonLauncher = Resolve-PythonLauncher
-if ($pythonLauncher -eq 'python') {
-  $frontendCmd = "python -m http.server 5173 --directory `"$frontendPath`""
-} else {
-  $frontendCmd = "py -m http.server 5173 --directory `"$frontendPath`""
-}
+$frontendCmd = "npm --prefix `"$frontendPath`" run dev -- --host 0.0.0.0 --port 5173"
 
 $frontendProc = Start-Process -FilePath 'powershell' -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $frontendCmd -PassThru
 Write-Host "[dev-up] Frontend launched. PID=$($frontendProc.Id)"
@@ -147,7 +129,7 @@ if (-not $SkipSmokeTests) {
     $smoke.health = [ordered]@{ status = 0; ok = $false; error = $_.Exception.Message }
   }
 
-  $loginBody = @{ cedula = '10101010'; password = '123456'; rutaNumero = 'R1' } | ConvertTo-Json
+  $loginBody = @{ usuario = 'tecnico.demo@trazaDH.com'; password = 'trazaDH1010'; rutaNumero = 'R1' } | ConvertTo-Json
   try {
     $login = Invoke-WebRequest -Uri 'http://localhost:3000/auth/login' -Method Post -ContentType 'application/json' -Body $loginBody -UseBasicParsing -TimeoutSec 10
     $smoke.login = [ordered]@{ status = [int]$login.StatusCode; ok = ($login.StatusCode -eq 201 -or $login.StatusCode -eq 200) }

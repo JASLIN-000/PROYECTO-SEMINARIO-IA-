@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CalendarioController } from './calendario.controller';
 import { AuthModule } from './auth/auth.module';
 import { EquiposModule } from './equipos/equipos.module';
 import { HallazgosModule } from './hallazgos/hallazgos.module';
@@ -38,7 +39,7 @@ import { Plantilla } from './common/entities/plantilla.entity';
     ModulosModule,
     PlantillasModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, CalendarioController],
   providers: [AppService],
 })
 export class AppModule {}

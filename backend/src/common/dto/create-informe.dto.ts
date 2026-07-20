@@ -44,4 +44,10 @@ export class CreateInformeDto {
   @IsOptional()
   @IsString()
   recomendaciones?: string = '';
+
+  @IsOptional()
+  @IsArray()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  hallazgoIds?: number[] = [];
 }

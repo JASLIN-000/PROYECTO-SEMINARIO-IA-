@@ -21,9 +21,10 @@ export class CreateHallazgoDto {
   mantenimiento_id?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  equipoId?: number;
+  @Type(() => String)
+  @IsString()
+  @MaxLength(30)
+  equipoId?: string;
 
   @IsOptional()
   @IsString()

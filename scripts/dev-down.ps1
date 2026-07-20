@@ -50,5 +50,6 @@ if (Test-Path $stateFile) {
 
 Stop-PortListeners -Port 3000
 Stop-PortListeners -Port 5173
+Stop-PortListeners -Port 5174
 
 Write-Host '[dev-down] Done.'

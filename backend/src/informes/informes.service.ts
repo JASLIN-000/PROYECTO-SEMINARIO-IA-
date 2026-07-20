@@ -7,7 +7,7 @@ import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Informe } from '../common/entities/informe.entity';
 import { Modulo } from '../common/entities/modulo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
-import { getBusinessDayContext, getConfiguredHolidaySet } from '../common/utils/business-days';
+import { getBusinessDayContext, loadConfiguredHolidaySet, toIsoDate } from '../common/utils/business-days';
 
 const DEFAULT_ALLOWED_MODULES = [
   'VERIFICACION DE SEGURIDAD Y CALIDAD',
@@ -93,7 +93,8 @@ export class InformesService {
 
     const plantillas = await this.loadPlantillas(modulos);
     const textoPlantillas = this.composeTemplateText(plantillas);
-    const hallazgos = await this.loadHallazgosForDraft(equipoId, mantenimientoId);
+    const hallazgoIds = this.normalizeHallazgoIds(body.hallazgoIds);
+    const hallazgos = await this.loadHallazgosForDraft(equipoId, mantenimientoId, hallazgoIds);
     const seccionHallazgos = this.composeHallazgosSection(hallazgos);
 
     const blocks = [
@@ -179,11 +180,29 @@ export class InformesService {
       .getMany();
   }
 
-  private async loadHallazgosForDraft(equipoId: number | null, mantenimientoId: number | null) {
+  private async loadHallazgosForDraft(
+    equipoId: number | null,
+    mantenimientoId: number | null,
+    hallazgoIds: number[] = [],
+  ) {
     const fromDate = this.getIsoDateMonthsAgo(5);
     const byId = new Map<number, Hallazgo>();
 
-    if (mantenimientoId) {
+    const selectedIds = new Set(hallazgoIds.filter((value) => Number.isFinite(value) && value > 0));
+
+    if (selectedIds.size) {
+      const selectedHallazgos = await this.hallazgosRepository
+        .createQueryBuilder('hallazgo')
+        .where('hallazgo.id IN (:...ids)', { ids: Array.from(selectedIds) })
+        .orderBy('hallazgo.fechaHallazgo', 'DESC')
+        .getMany();
+
+      selectedHallazgos.forEach((item) => {
+        byId.set(item.id, item);
+      });
+    }
+
+    if (mantenimientoId && !selectedIds.size) {
       const current = await this.hallazgosRepository.find({
         where: { mantenimientoId },
         order: { fechaHallazgo: 'DESC' },
@@ -194,7 +213,7 @@ export class InformesService {
       });
     }
 
-    if (equipoId) {
+    if (equipoId && !selectedIds.size) {
       const history = await this.hallazgosRepository
         .createQueryBuilder('hallazgo')
         .where('hallazgo.equipoId = :equipoId', { equipoId })
@@ -208,6 +227,20 @@ export class InformesService {
     }
 
     return Array.from(byId.values()).sort((a, b) => String(b.fechaHallazgo).localeCompare(String(a.fechaHallazgo)));
+  }
+
+  private normalizeHallazgoIds(value?: number[]) {
+    if (!Array.isArray(value)) {
+      return [] as number[];
+    }
+
+    return Array.from(
+      new Set(
+        value
+          .map((item) => Number(item))
+          .filter((item) => Number.isFinite(item) && item > 0),
+      ),
+    );
   }
 
   private async normalizeModules(body: CreateInformeDto) {
@@ -353,7 +386,7 @@ export class InformesService {
         throw new BadRequestException('Equipo no encontrado.');
       }
 
-      this.assertEquipoProgramadoHoy(equipo, rutaNumero);
+      await this.assertEquipoProgramadoHoy(equipo, rutaNumero);
       return normalizedId;
     }
 
@@ -371,14 +404,15 @@ export class InformesService {
       throw new BadRequestException(`No existe equipo con codigo ${code}.`);
     }
 
-    this.assertEquipoProgramadoHoy(equipo, rutaNumero);
+    await this.assertEquipoProgramadoHoy(equipo, rutaNumero);
 
     return equipo.id;
   }
 
-  private assertEquipoProgramadoHoy(equipo: Equipo, rutaNumero?: string) {
+  private async assertEquipoProgramadoHoy(equipo: Equipo, rutaNumero?: string) {
     const today = new Date();
-    const calendario = getBusinessDayContext(today, getConfiguredHolidaySet(today));
+    const holidays = await loadConfiguredHolidaySet(today);
+    const calendario = getBusinessDayContext(today, holidays);
 
     if (!calendario.isBusinessDay) {
       throw new BadRequestException('Hoy no es dia habil. Solo se pueden generar informes para equipos programados en dia habil.');
@@ -410,7 +444,7 @@ export class InformesService {
   private getIsoDateMonthsAgo(months: number) {
     const date = new Date();
     date.setUTCMonth(date.getUTCMonth() - months);
-    return date.toISOString().slice(0, 10);
+    return toIsoDate(date);
   }
 
   private toResponse(informe: Informe) {

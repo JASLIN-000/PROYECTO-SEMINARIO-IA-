@@ -2,7 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Equipo } from '../common/entities/equipo.entity';
-import { getBusinessDayContext, getConfiguredHolidaySet } from '../common/utils/business-days';
+import { getBusinessDayContext, loadConfiguredHolidaySet } from '../common/utils/business-days';
+
+type WorkWindow = {
+  startMinutes: number;
+  endMinutes: number;
+};
+
+type MaintenanceSlot = {
+  horaInicio: string;
+  horaFin: string;
+  horaProgramada: string;
+};
 
 @Injectable()
 export class EquiposService {
@@ -19,7 +30,8 @@ export class EquiposService {
     await this.normalizeActiveServiceDayIndexes();
 
     const targetDate = this.parseTargetDate(fecha);
-    const calendario = getBusinessDayContext(targetDate, getConfiguredHolidaySet(targetDate));
+    const holidays = await loadConfiguredHolidaySet(targetDate);
+    const calendario = getBusinessDayContext(targetDate, holidays);
     const normalizedRoute = rutaNumero?.trim().toLowerCase();
 
     if (!calendario.isBusinessDay) {
@@ -37,6 +49,8 @@ export class EquiposService {
       q,
     );
 
+    const slots = this.buildMaintenanceSlots(equipos.length, targetDate);
+
     const mensaje = equipos.length
       ? 'Equipos programados cargados correctamente.'
       : 'No existen equipos programados para el dia habil actual con los filtros aplicados.';
@@ -45,7 +59,16 @@ export class EquiposService {
       ok: true,
       mensaje,
       calendario,
-      equipos: equipos.map((equipo) => ({
+      equipos: equipos.map((equipo, index) => {
+        const slot = slots[index] ?? {
+          horaInicio: null,
+          horaFin: null,
+          horaProgramada: null,
+        };
+
+        return {
+          ...slot,
+        horaAlmuerzo: '12:00 - 13:00',
         id: equipo.id,
         idEquipo: equipo.idEquipo,
         nombreEquipo: equipo.nombreEquipo,
@@ -53,8 +76,97 @@ export class EquiposService {
         estado: equipo.estado,
         rutaNumero: equipo.rutaNumero ?? null,
         historialHallazgosUrl: `/hallazgos?equipoId=${equipo.id}`,
-      })),
+        };
+      }),
     };
+  }
+
+  private buildMaintenanceSlots(total: number, targetDate: Date): MaintenanceSlot[] {
+    if (total <= 0) {
+      return [];
+    }
+
+    const windows = this.getWorkingWindows(targetDate);
+    const totalWorkMinutes = windows.reduce((acc, window) => acc + (window.endMinutes - window.startMinutes), 0);
+    const slotWorkMinutes = totalWorkMinutes / total;
+
+    const slots: MaintenanceSlot[] = [];
+    for (let index = 0; index < total; index += 1) {
+      const startWorkMinute = index * slotWorkMinutes;
+      const endWorkMinute = (index + 1) * slotWorkMinutes;
+
+      const startClock = this.workMinuteToClock(startWorkMinute, windows);
+      const endClock = this.workMinuteToClock(endWorkMinute, windows);
+
+      const horaInicio = this.formatClock(startClock);
+      const horaFin = this.formatClock(endClock);
+      const horaProgramada = this.formatProgrammedRange(startClock, endClock, windows);
+
+      slots.push({
+        horaInicio,
+        horaFin,
+        horaProgramada,
+      });
+    }
+
+    return slots;
+  }
+
+  private getWorkingWindows(targetDate: Date): WorkWindow[] {
+    const day = targetDate.getUTCDay();
+    const isFriday = day === 5;
+
+    return [
+      // Manana: 07:30 - 12:00
+      { startMinutes: 7 * 60 + 30, endMinutes: 12 * 60 },
+      // Tarde: 13:00 - 17:00 (L-J) / 13:00 - 16:30 (V)
+      { startMinutes: 13 * 60, endMinutes: isFriday ? 16 * 60 + 30 : 17 * 60 },
+    ];
+  }
+
+  private workMinuteToClock(workMinute: number, windows: WorkWindow[]) {
+    const clamped = Math.max(0, workMinute);
+    let remaining = clamped;
+
+    for (const window of windows) {
+      const duration = window.endMinutes - window.startMinutes;
+      if (remaining <= duration) {
+        return window.startMinutes + remaining;
+      }
+
+      remaining -= duration;
+    }
+
+    return windows[windows.length - 1].endMinutes;
+  }
+
+  private formatClock(totalMinutes: number) {
+    const rounded = Math.round(totalMinutes);
+    const hours = Math.floor(rounded / 60);
+    const minutes = rounded % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+
+  private formatProgrammedRange(startClock: number, endClock: number, windows: WorkWindow[]) {
+    const start = this.formatClock(startClock);
+    const end = this.formatClock(endClock);
+
+    for (let index = 0; index < windows.length - 1; index += 1) {
+      const current = windows[index];
+      const next = windows[index + 1];
+      const breakStart = current.endMinutes;
+      const breakEnd = next.startMinutes;
+
+      if (startClock < breakStart && endClock > breakEnd) {
+        const beforeBreak = `${start} - ${this.formatClock(breakStart)}`;
+        const afterBreak = `${this.formatClock(breakEnd)} - ${end}`;
+        return `${beforeBreak} / ${afterBreak}`;
+      }
+    }
+
+    return `${start} - ${end}`;
   }
 
   private async loadEquiposByBusinessDayIndex(
