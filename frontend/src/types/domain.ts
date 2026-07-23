@@ -20,11 +20,18 @@ export type Equipo = {
   horaAlmuerzo?: string | null;
   historialHallazgosUrl?: string;
   ubicacion?: string;
+  direccion?: string;
   modelo?: string;
   tipoMantenimiento?: string;
   horaProgramada?: string;
   ultimoMantenimiento?: string;
   proximoMantenimiento?: string;
+  tecnicoResponsable?: string;
+  ingenieroResponsable?: string;
+  ejecutivaCuenta?: string;
+  administracion?: string;
+  numeroContacto?: string;
+  tipoContrato?: string;
   hallazgosAbiertos?: number;
   informesCount?: number;
 };
@@ -70,9 +77,8 @@ export type Informe = {
   modulos: string[];
   observaciones: string;
   pendientes: string | null;
-  recomendaciones: string | null;
   fechaGeneracion: string;
-  estado?: 'Pendiente' | 'En proceso' | 'Finalizado';
+  estado?: 'PENDIENTE' | 'EN PROCESO' | 'FINALIZADO' | string;
   tecnicoResponsable?: string;
 };
 

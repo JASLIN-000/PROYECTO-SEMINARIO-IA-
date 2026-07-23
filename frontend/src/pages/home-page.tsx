@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
   CalendarDays,
   CircleCheck,
   FileCheck,
-  FileText,
+  FilePlus2,
 } from 'lucide-react';
 import { CalendarCard } from '@/components/calendar-card';
 import { EmptyState } from '@/components/empty-state';
 import { EquipmentCard } from '@/components/equipment-card';
 import { LoadingSpinner } from '@/components/loading-spinner';
-import { ReportGeneratorDialog } from '@/components/report-generator-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +19,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEquiposProgramados, useHallazgos, useInformes } from '@/hooks/use-dashboard';
-import { fetchPlantillas } from '@/services/informes.service';
 import { getErrorMessage, normalizeText } from '@/lib/utils';
 import type { Equipo, Hallazgo } from '@/types/domain';
 import { toIsoDate } from '@/utils/business-days';
@@ -30,17 +27,12 @@ export function HomePage() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [historyEquipo, setHistoryEquipo] = useState<Equipo | null>(null);
-  const [reportEquipo, setReportEquipo] = useState<Equipo | null>(null);
 
   const selectedIso = toIsoDate(selectedDate);
   const todayIso = toIsoDate(new Date());
   const query = useEquiposProgramados(selectedIso);
   const hallazgosQuery = useHallazgos({});
   const informesQuery = useInformes();
-  const plantillasQuery = useQuery({
-    queryKey: ['plantillas-home'],
-    queryFn: fetchPlantillas,
-  });
 
   const historialHallazgosEquipo = useMemo(() => {
     if (!historyEquipo) {
@@ -53,16 +45,6 @@ export function HomePage() {
         normalizeText(item.nombreEquipo ?? '') === normalizeText(historyEquipo.nombreEquipo),
     );
   }, [hallazgosQuery.data, historyEquipo]);
-
-  const hallazgosEquipo = useMemo(() => {
-    if (!reportEquipo) {
-      return [] as Hallazgo[];
-    }
-
-    return (hallazgosQuery.data ?? []).filter(
-      (item) => normalizeText(item.idEquipo ?? '') === normalizeText(reportEquipo.idEquipo),
-    );
-  }, [hallazgosQuery.data, reportEquipo]);
 
   const hallazgosPendientes = (hallazgosQuery.data ?? []).filter(
     (item) => item.estado === 'ABIERTO' || item.estado === 'PENDIENTE',
@@ -108,8 +90,21 @@ export function HomePage() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size='lg' onClick={() => navigate('/informes')}>
-                <FileText className='mr-2 h-4 w-4' /> Generar informes
+              <Button
+                size='lg'
+                onClick={() => {
+                  const firstEquipo = query.data?.equipos?.[0];
+                  if (!firstEquipo) {
+                    navigate('/informes?generar=1');
+                    return;
+                  }
+
+                  navigate(
+                    `/informes?equipoId=${firstEquipo.id}&equipoCodigo=${encodeURIComponent(firstEquipo.idEquipo)}&generar=1`,
+                  );
+                }}
+              >
+                <FilePlus2 className='mr-2 h-4 w-4' /> Generar informes
               </Button>
             </TooltipTrigger>
             <TooltipContent>Abrir el flujo completo de informes</TooltipContent>
@@ -159,7 +154,11 @@ export function HomePage() {
                           <EquipmentCard
                             equipo={equipo}
                             onViewHistory={setHistoryEquipo}
-                            onGenerateReport={setReportEquipo}
+                            onGenerateReport={(selectedEquipo) => {
+                              navigate(
+                                `/informes?equipoId=${selectedEquipo.id}&equipoCodigo=${encodeURIComponent(selectedEquipo.idEquipo)}&generar=1`,
+                              );
+                            }}
                           />
                         </motion.div>
                       ))}
@@ -211,6 +210,21 @@ export function HomePage() {
                 <p className='text-xs font-semibold uppercase tracking-[0.16em] text-[#6B7280]'>Historial de hallazgos</p>
                 <h2 className='mt-2 font-display text-2xl font-bold text-[#111827]'>{historyEquipo?.idEquipo}</h2>
                 <p className='mt-1 text-sm text-[#6B7280]'>{historyEquipo?.nombreEquipo}</p>
+                <div className='mt-4'>
+                  <Button
+                    size='sm'
+                    onClick={() => {
+                      if (!historyEquipo) {
+                        return;
+                      }
+
+                      navigate(`/hallazgos?equipoId=${encodeURIComponent(historyEquipo.idEquipo)}`);
+                      setHistoryEquipo(null);
+                    }}
+                  >
+                    Agregar hallazgo
+                  </Button>
+                </div>
               </div>
 
               <ScrollArea className='flex-1 px-6 py-5'>
@@ -242,14 +256,6 @@ export function HomePage() {
           </SheetContent>
         </Sheet>
 
-        <ReportGeneratorDialog
-          open={Boolean(reportEquipo)}
-          onOpenChange={(open) => !open && setReportEquipo(null)}
-          equipo={reportEquipo}
-          hallazgos={hallazgosEquipo}
-          plantillas={plantillasQuery.data ?? []}
-          onOpenHistory={setHistoryEquipo}
-        />
       </section>
     </TooltipProvider>
   );

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { CreateInformeDto } from '../common/dto/create-informe.dto';
 import { InformesService } from './informes.service';
 
@@ -19,5 +19,10 @@ export class InformesController {
   @Post()
   create(@Body() body: CreateInformeDto, @Headers('x-ruta-numero') rutaNumero?: string) {
     return this.informesService.create(body, rutaNumero);
+  }
+
+  @Patch(':id/finalizar')
+  finalize(@Param('id') id: string) {
+    return this.informesService.finalize(+id);
   }
 }

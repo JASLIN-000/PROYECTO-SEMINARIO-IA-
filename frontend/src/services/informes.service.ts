@@ -10,7 +10,6 @@ export type CreateInformePayload = {
   hallazgoIds?: number[];
   observaciones?: string;
   pendientes?: string;
-  recomendaciones?: string;
 };
 
 export async function fetchInformes() {
@@ -20,7 +19,7 @@ export async function fetchInformes() {
     ...informe,
     idEquipo: informe.idEquipo ?? informe.equipoCodigo ?? null,
     nombreEquipo: informe.nombreEquipo ?? informe.equipoNombre ?? null,
-    estado: inferEstado(informe.fechaGeneracion),
+    estado: normalizeInformeEstado(informe.estado, informe.fechaGeneracion),
     tecnicoResponsable: 'Tecnico ruta',
   }));
 }
@@ -40,16 +39,26 @@ export async function createInforme(payload: CreateInformePayload) {
   return data;
 }
 
-function inferEstado(fechaGeneracion: string) {
+export async function finalizeInforme(id: number) {
+  const { data } = await apiClient.patch<Informe>(`/informes/${id}/finalizar`);
+  return data;
+}
+
+function normalizeInformeEstado(estado: string | undefined, fechaGeneracion: string) {
+  const normalized = String(estado || '').trim().toUpperCase();
+  if (normalized === 'FINALIZADO' || normalized === 'PENDIENTE' || normalized === 'EN PROCESO') {
+    return normalized;
+  }
+
   const generatedAt = new Date(fechaGeneracion).getTime();
   const now = Date.now();
   const diff = now - generatedAt;
 
   if (diff < 1000 * 60 * 60 * 12) {
-    return 'En proceso' as const;
+    return 'EN PROCESO' as const;
   }
   if (diff < 1000 * 60 * 60 * 36) {
-    return 'Pendiente' as const;
+    return 'PENDIENTE' as const;
   }
-  return 'Finalizado' as const;
+  return 'FINALIZADO' as const;
 }

@@ -62,14 +62,15 @@ export class InformesService {
 
     const draft = await this.buildDraft(body, rutaNumero);
     const observaciones = body.observaciones?.trim() || draft.textoGenerado || 'Informe sin plantilla asociada';
+    const pendientes = this.normalizeOptionalText(body.pendientes) || draft.pendientesAuto || null;
 
     const entity = this.informesRepository.create({
       mantenimientoId: draft.mantenimientoId,
       equipoId: draft.equipoId,
       modulosText: JSON.stringify(draft.modulos),
       observaciones,
-      pendientes: this.normalizeOptionalText(body.pendientes),
-      recomendaciones: this.normalizeOptionalText(body.recomendaciones),
+      pendientes,
+      estado: 'FINALIZADO',
       fechaGeneracion: new Date(),
     });
 
@@ -81,6 +82,20 @@ export class InformesService {
       accion: 'creado',
       resumenHallazgos: draft.resumenHallazgos,
     };
+  }
+
+  async finalize(id: number) {
+    await this.ensureSchema();
+
+    const informe = await this.informesRepository.findOne({ where: { id } });
+    if (!informe) {
+      return null;
+    }
+
+    informe.estado = 'FINALIZADO';
+    const saved = await this.informesRepository.save(informe);
+    const [response] = await this.enrichInformesResponse([saved]);
+    return response ?? null;
   }
 
   private async buildDraft(body: CreateInformeDto, rutaNumero?: string) {
@@ -96,6 +111,7 @@ export class InformesService {
     const hallazgoIds = this.normalizeHallazgoIds(body.hallazgoIds);
     const hallazgos = await this.loadHallazgosForDraft(equipoId, mantenimientoId, hallazgoIds);
     const seccionHallazgos = this.composeHallazgosSection(hallazgos);
+    const pendientesAuto = this.composePendientesText(hallazgos);
 
     const blocks = [
       textoPlantillas || 'No existe plantilla para alguno de los modulos seleccionados. Redaccion manual habilitada.',
@@ -115,6 +131,7 @@ export class InformesService {
         : null,
       modulos,
       textoGenerado: blocks.join('\n\n'),
+      pendientesAuto,
       resumenHallazgos: {
         total: hallazgos.length,
         abiertos: hallazgos.filter((item) => this.normalizeEstado(item.estado) === 'ABIERTO').length,
@@ -148,6 +165,7 @@ export class InformesService {
           observaciones TEXT NOT NULL,
           pendientes TEXT NULL,
           recomendaciones TEXT NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
           fecha_generacion TIMESTAMP NOT NULL DEFAULT NOW(),
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -155,6 +173,15 @@ export class InformesService {
 
         ALTER TABLE informes
         DROP COLUMN IF EXISTS plantillas_aplicadas_text;
+
+        ALTER TABLE informes
+        ADD COLUMN IF NOT EXISTS estado VARCHAR(20);
+
+        UPDATE informes
+        SET estado = COALESCE(NULLIF(TRIM(estado), ''), 'PENDIENTE');
+
+        ALTER TABLE informes
+        ALTER COLUMN estado SET DEFAULT 'PENDIENTE';
 
         CREATE INDEX IF NOT EXISTS idx_informes_fecha_generacion ON informes(fecha_generacion DESC);
         CREATE INDEX IF NOT EXISTS idx_informes_equipo_id ON informes(equipo_id);
@@ -213,7 +240,7 @@ export class InformesService {
       });
     }
 
-    if (equipoId && !selectedIds.size) {
+    if (equipoId) {
       const history = await this.hallazgosRepository
         .createQueryBuilder('hallazgo')
         .where('hallazgo.equipoId = :equipoId', { equipoId })
@@ -332,6 +359,21 @@ export class InformesService {
     }
 
     return `Seccion de hallazgos\n\n${sectionBlocks.join('\n\n')}`;
+  }
+
+  private composePendientesText(hallazgos: Hallazgo[]) {
+    if (!hallazgos.length) {
+      return null;
+    }
+
+    const lines = hallazgos.map((item) => {
+      const fecha = item.fechaHallazgo || '-';
+      const modulo = item.modulo || '-';
+      const descripcion = item.descripcionHallazgo || 'Sin descripcion';
+      return `[${fecha}] (${modulo}) ${descripcion}`;
+    });
+
+    return lines.join('\n');
   }
 
   private composeCotizacionSuggestions(hallazgos: Hallazgo[]) {
@@ -455,7 +497,7 @@ export class InformesService {
       modulos: this.parseJsonArray(informe.modulosText),
       observaciones: informe.observaciones,
       pendientes: informe.pendientes,
-      recomendaciones: informe.recomendaciones,
+      estado: String(informe.estado || 'PENDIENTE').trim().toUpperCase(),
       fechaGeneracion:
         informe.fechaGeneracion instanceof Date
           ? informe.fechaGeneracion.toISOString()

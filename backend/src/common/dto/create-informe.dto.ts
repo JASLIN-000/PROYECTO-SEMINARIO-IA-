@@ -42,10 +42,6 @@ export class CreateInformeDto {
   pendientes?: string = '';
 
   @IsOptional()
-  @IsString()
-  recomendaciones?: string = '';
-
-  @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsInt({ each: true })

@@ -1,377 +1,311 @@
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ColumnDef } from '@tanstack/react-table';
-import { Eye } from 'lucide-react';
-import { DataTable } from '@/components/data-table';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ListFilter, Sparkles } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/empty-state';
 import { LoadingSpinner } from '@/components/loading-spinner';
-import { PageHeader } from '@/components/page-header';
-import { SearchBar } from '@/components/search-bar';
+import { ReportGeneratorDialog } from '@/components/report-generator-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createHallazgo, fetchHallazgos } from '@/services/hallazgos.service';
-import { createInforme, fetchPlantillas, previewInforme } from '@/services/informes.service';
-import { useInformes } from '@/hooks/use-dashboard';
-import { formatDate, normalizeText } from '@/lib/utils';
-import type { Informe } from '@/types/domain';
+import { useHallazgos, useInformes } from '@/hooks/use-dashboard';
+import { formatDate, getErrorMessage, normalizeText } from '@/lib/utils';
+import { fetchEquiposProgramados } from '@/services/equipos.service';
+import { fetchPlantillas } from '@/services/informes.service';
+import type { Equipo } from '@/types/domain';
 
 export function InformesPage() {
-  const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
-  const prefilledEquipoId = searchParams.get('equipoId') ?? '';
-  const prefilledEquipoCodigo = searchParams.get('equipoCodigo') ?? '';
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null);
+  const [selectionResolved, setSelectionResolved] = useState(false);
+  const [manualEquipoInput, setManualEquipoInput] = useState('');
+  const [manualLookupError, setManualLookupError] = useState('');
+  const [reportSearch, setReportSearch] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState<'TODOS' | 'PENDIENTE' | 'EN PROCESO' | 'FINALIZADO'>('TODOS');
 
-  const [search, setSearch] = useState('');
-  const [estado, setEstado] = useState('');
-  const [equipoId, setEquipoId] = useState(prefilledEquipoId);
-  const [equipoCodigo, setEquipoCodigo] = useState(prefilledEquipoCodigo);
-  const [mantenimientoId, setMantenimientoId] = useState('');
-  const [modulos, setModulos] = useState('VERIFICACION DE SEGURIDAD Y CALIDAD');
-  const [observaciones, setObservaciones] = useState('');
-  const [pendientes, setPendientes] = useState('');
-  const [recomendaciones, setRecomendaciones] = useState('');
-  const [activePanel, setActivePanel] = useState<'hallazgos' | 'informes' | 'reportar'>('hallazgos');
-  const [hallazgoModulo, setHallazgoModulo] = useState('');
-  const [hallazgoDescripcion, setHallazgoDescripcion] = useState('');
-  const [hallazgoObservacion, setHallazgoObservacion] = useState('');
-  const [hallazgoCotizacion, setHallazgoCotizacion] = useState<'SI' | 'NO' | 'NA'>('NO');
-  const [hallazgoEstado, setHallazgoEstado] = useState<'ABIERTO' | 'PENDIENTE' | 'SOLUCIONADO'>('ABIERTO');
+  const equipoIdParam = searchParams.get('equipoId');
+  const equipoCodigoParam = searchParams.get('equipoCodigo');
+  const fromWorkspaceEntry = searchParams.get('generar') === '1' || Boolean(equipoIdParam || equipoCodigoParam);
 
-  const query = useInformes();
-  const hallazgosEquipoQuery = useQuery({
-    queryKey: ['hallazgos-equipo-informe', equipoCodigo],
-    queryFn: () => fetchHallazgos({ equipoId: equipoCodigo || undefined }),
-    enabled: Boolean(equipoCodigo),
+  const equiposQuery = useQuery({
+    queryKey: ['equipos-workspace-catalog'],
+    queryFn: () => fetchEquiposProgramados(undefined, undefined, true),
+    retry: 2,
   });
+  const equiposCatalog = equiposQuery.data?.equipos ?? [];
+  const hallazgosQuery = useHallazgos({});
+  const informesQuery = useInformes();
   const plantillasQuery = useQuery({
     queryKey: ['plantillas'],
     queryFn: fetchPlantillas,
-  });
-  const previewQuery = useQuery({
-    queryKey: ['informe-preview', equipoId, equipoCodigo, modulos, mantenimientoId],
-    enabled: Boolean(modulos.trim()),
-    queryFn: () => {
-      const moduleList = modulos
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, 3);
-
-      return previewInforme({
-        equipoId: equipoId ? Number(equipoId) : undefined,
-        equipoCodigo: equipoCodigo || undefined,
-        mantenimientoId: mantenimientoId ? Number(mantenimientoId) : undefined,
-        modulos: moduleList,
-      });
-    },
+    retry: 2,
   });
 
-  const createMutation = useMutation({
-    mutationFn: createInforme,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['informes'] });
-      setObservaciones('');
-      setPendientes('');
-      setRecomendaciones('');
-    },
-  });
-
-  const reportHallazgoMutation = useMutation({
-    mutationFn: createHallazgo,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['hallazgos-equipo-informe', equipoCodigo] });
-      setHallazgoDescripcion('');
-      setHallazgoObservacion('');
-    },
-  });
-
-  const filtered = useMemo(() => {
-    const term = normalizeText(search);
-    const statusTerm = normalizeText(estado);
-
-    return (query.data ?? []).filter((item) => {
-      const bySearch = !term
-        ? true
-        : [item.nombreEquipo ?? '', item.idEquipo ?? '', item.tecnicoResponsable ?? ''].some((part) =>
-            normalizeText(part).includes(term),
-          );
-      const byEstado = !statusTerm ? true : normalizeText(item.estado ?? '').includes(statusTerm);
-      return bySearch && byEstado;
-    });
-  }, [estado, query.data, search]);
-
-  const historialInformesEquipo = useMemo(() => {
-    if (!equipoCodigo && !equipoId) {
-      return [] as Informe[];
+  useEffect(() => {
+    if (!fromWorkspaceEntry || selectionResolved || !equiposCatalog.length) {
+      return;
     }
 
-    return (query.data ?? []).filter(
-      (item) =>
-        (equipoCodigo && (item.idEquipo === equipoCodigo || item.equipoCodigo === equipoCodigo)) ||
-        (equipoId && item.equipoId === Number(equipoId)),
+    const match = equiposCatalog.find((equipo) => {
+      if (equipoIdParam && Number(equipoIdParam) === equipo.id) {
+        return true;
+      }
+
+      if (equipoCodigoParam && normalizeText(equipoCodigoParam) === normalizeText(equipo.idEquipo)) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (match) {
+      setSelectedEquipo(match);
+    }
+
+    setSelectionResolved(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('generar');
+    nextParams.delete('equipoId');
+    nextParams.delete('equipoCodigo');
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    equipoCodigoParam,
+    equipoIdParam,
+    equiposCatalog,
+    fromWorkspaceEntry,
+    searchParams,
+    selectionResolved,
+    setSearchParams,
+  ]);
+
+  const hasInitialError = equiposQuery.isError || hallazgosQuery.isError || plantillasQuery.isError || informesQuery.isError;
+  const isInitialLoading = equiposQuery.isLoading || hallazgosQuery.isLoading || plantillasQuery.isLoading || informesQuery.isLoading;
+
+  const errorMessage = useMemo(() => {
+    const sourceError = equiposQuery.error ?? hallazgosQuery.error ?? plantillasQuery.error ?? informesQuery.error;
+    return getErrorMessage(sourceError, 'No fue posible cargar el workspace de informes.');
+  }, [equiposQuery.error, hallazgosQuery.error, informesQuery.error, plantillasQuery.error]);
+
+  const informes = informesQuery.data ?? [];
+
+  const filteredInformes = useMemo(() => {
+    const term = normalizeText(reportSearch);
+
+    return informes
+      .filter((item) => {
+        const estadoNormalized = String(item.estado || '').trim().toUpperCase();
+        if (estadoFilter !== 'TODOS' && estadoNormalized !== estadoFilter) {
+          return false;
+        }
+
+        if (!term) {
+          return true;
+        }
+
+        const haystack = [
+          item.nombreEquipo ?? '',
+          item.idEquipo ?? '',
+          estadoNormalized,
+          item.modulos.join(' '),
+          item.observaciones ?? '',
+        ].map(normalizeText);
+
+        return haystack.some((value) => value.includes(term));
+      })
+      .sort((left, right) => String(right.fechaGeneracion).localeCompare(String(left.fechaGeneracion)));
+  }, [estadoFilter, informes, reportSearch]);
+
+
+  if (isInitialLoading && !selectionResolved) {
+    return (
+      <section className='space-y-4'>
+        <LoadingSpinner label='Preparando workspace de informes...' />
+      </section>
     );
-  }, [equipoCodigo, equipoId, query.data]);
+  }
 
-  const modulosDisponibles = useMemo(() => {
-    const unique = new Set((plantillasQuery.data ?? []).map((item) => item.modulo).filter(Boolean));
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [plantillasQuery.data]);
+  if (hasInitialError) {
+    return (
+      <section className='space-y-4'>
+        <EmptyState title='Error al cargar informes' description={errorMessage} />
+        <Button variant='outline' onClick={() => navigate('/')}>
+          <ArrowLeft className='mr-2 h-4 w-4' /> Volver a Inicio
+        </Button>
+      </section>
+    );
+  }
 
-  const canSubmitHallazgo = Boolean(equipoCodigo && hallazgoModulo && hallazgoDescripcion.trim());
+  if (!selectedEquipo) {
+    const handleManualOpen = () => {
+      const term = manualEquipoInput.trim();
+      if (!term) {
+        setManualLookupError('Ingresa un codigo o ID de equipo.');
+        return;
+      }
 
-  const columns = useMemo<ColumnDef<Informe>[]>(
-    () => [
-      {
-        accessorKey: 'nombreEquipo',
-        header: 'Equipo',
-      },
-      {
-        accessorKey: 'fechaGeneracion',
-        header: 'Fecha',
-        cell: ({ row }) => formatDate(row.original.fechaGeneracion, 'dd/MM/yyyy HH:mm'),
-      },
-      {
-        accessorKey: 'modulos',
-        header: 'Tipo mantenimiento',
-        cell: ({ row }) => row.original.modulos?.join(', ') ?? '-',
-      },
-      {
-        accessorKey: 'tecnicoResponsable',
-        header: 'Tecnico',
-      },
-      {
-        accessorKey: 'estado',
-        header: 'Estado',
-        cell: ({ row }) => <StatusBadge status={row.original.estado} />,
-      },
-      {
-        id: 'actions',
-        header: '',
-        cell: () => (
-          <Button variant='outline' size='sm'>
-            <Eye className='mr-2 h-4 w-4' /> Ver informe
-          </Button>
-        ),
-      },
-    ],
-    [],
-  );
+      const normalizedTerm = normalizeText(term);
+      const parsedId = Number(term);
+
+      const match = equiposCatalog.find((equipo) => {
+        if (Number.isFinite(parsedId) && parsedId > 0 && equipo.id === parsedId) {
+          return true;
+        }
+
+        return normalizeText(equipo.idEquipo) === normalizedTerm;
+      });
+
+      if (!match) {
+        setManualLookupError('No encontramos un equipo con ese codigo o ID.');
+        return;
+      }
+
+      setManualLookupError('');
+      setSelectedEquipo(match);
+    };
+
+    return (
+      <section className='space-y-6'>
+        <div>
+          <h1 className='text-3xl font-semibold tracking-tight text-[#111827] sm:text-4xl'>Informes de mantenimiento</h1>
+          <p className='mt-1 text-sm text-[#6B7280]'>Consulta, gestiona y genera informes de los equipos.</p>
+        </div>
+
+        <Card className='border-black/5'>
+          <CardContent className='space-y-3 p-4'>
+            <div className='flex items-center gap-2'>
+              <Sparkles className='h-4 w-4 text-[#A11D2E]' />
+              <h2 className='text-sm font-semibold text-[#111827]'>Generar informe</h2>
+            </div>
+
+            <div className='grid gap-2 rounded-xl border border-black/5 bg-[#FCFCFD] p-3 sm:grid-cols-[1fr_auto]'>
+              <Input
+                value={manualEquipoInput}
+                onChange={(event) => {
+                  setManualEquipoInput(event.target.value);
+                  if (manualLookupError) {
+                    setManualLookupError('');
+                  }
+                }}
+                placeholder='Ingresa ID o código del equipo (ej: 1497S-01 o 124)'
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleManualOpen();
+                  }
+                }}
+              />
+              <Button onClick={handleManualOpen}>Abrir visual</Button>
+            </div>
+
+            {manualLookupError ? <p className='text-xs text-[#C62828]'>{manualLookupError}</p> : null}
+          </CardContent>
+        </Card>
+
+        <Card className='border-black/5'>
+          <CardContent className='space-y-4 p-4'>
+            <div className='grid gap-3 xl:grid-cols-[1.6fr_.7fr]'>
+              <Input
+                value={reportSearch}
+                onChange={(event) => setReportSearch(event.target.value)}
+                placeholder='Buscar por ID, nombre o estado...'
+              />
+              <select
+                value={estadoFilter}
+                onChange={(event) => setEstadoFilter(event.target.value as 'TODOS' | 'PENDIENTE' | 'EN PROCESO' | 'FINALIZADO')}
+                className='h-10 rounded-xl border border-wine-100 bg-white px-3 text-sm text-[#374151]'
+              >
+                <option value='TODOS'>Estado: Todos</option>
+                <option value='PENDIENTE'>Pendiente</option>
+                <option value='EN PROCESO'>En proceso</option>
+                <option value='FINALIZADO'>Finalizado</option>
+              </select>
+            </div>
+
+            <div className='flex justify-start'>
+              <Button variant='secondary' onClick={() => navigate('/')}>
+                <ArrowLeft className='mr-2 h-4 w-4' /> Ir a Inicio
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className='border-black/5'>
+          <CardContent className='p-0'>
+            <div className='flex items-center justify-between border-b border-black/5 px-4 py-3'>
+              <h2 className='text-base font-semibold text-[#111827]'>Listado de informes</h2>
+              <p className='inline-flex items-center gap-1 text-xs text-[#6B7280]'>
+                <ListFilter className='h-3.5 w-3.5' /> {filteredInformes.length} resultados
+              </p>
+            </div>
+
+            {filteredInformes.length ? (
+              <div className='divide-y divide-black/5'>
+                {filteredInformes.slice(0, 20).map((item) => {
+                  const equipo = item.nombreEquipo ?? item.idEquipo ?? 'Equipo sin nombre';
+
+                  return (
+                    <article key={item.id} className='grid gap-3 px-4 py-3 sm:grid-cols-[1.5fr_.9fr_.7fr_auto] sm:items-center'>
+                      <div className='min-w-0'>
+                        <p className='truncate text-sm font-semibold text-[#111827]'>{equipo}</p>
+                        <p className='truncate text-xs text-[#6B7280]'>INF-{String(item.id).padStart(6, '0')}</p>
+                      </div>
+
+                      <p className='text-xs text-[#6B7280]'>{formatDate(item.fechaGeneracion, 'dd/MM/yyyy HH:mm')}</p>
+                      <StatusBadge status={item.estado} />
+
+                      <div className='flex justify-end'>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={() => {
+                            const candidate = equiposCatalog.find((eq) => {
+                              return (
+                                normalizeText(eq.idEquipo) === normalizeText(item.idEquipo ?? '') ||
+                                (item.equipoId ? eq.id === item.equipoId : false)
+                              );
+                            });
+
+                            if (candidate) {
+                              setSelectedEquipo(candidate);
+                            } else {
+                              setManualEquipoInput(item.idEquipo ?? '');
+                              setManualLookupError('No pudimos resolver ese equipo desde catálogo, valida código y vuelve a intentar.');
+                            }
+                          }}
+                        >
+                          Abrir
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className='p-8'>
+                <EmptyState title='No hay informes para los filtros aplicados' description='Ajusta búsqueda, estado o tipo para ver resultados.' />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
 
   return (
-    <section className='space-y-6'>
-      <PageHeader title='Informes' description='Ultimos informes de mantenimiento con filtros y navegacion.' />
-
-      <div className='space-y-3 rounded-2xl border border-wine-100 bg-white p-4'>
-        <h3 className='font-display text-lg font-semibold text-wine-900'>Generar informe</h3>
-        <div className='grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
-          <div className='space-y-3'>
-            <div className='grid gap-3 md:grid-cols-2'>
-              <Input value={equipoId} onChange={(event) => setEquipoId(event.target.value)} placeholder='Equipo ID (interno)' />
-              <Input value={equipoCodigo} onChange={(event) => setEquipoCodigo(event.target.value)} placeholder='Equipo codigo (ej: 4333S-01)' />
-              <Input value={mantenimientoId} onChange={(event) => setMantenimientoId(event.target.value)} placeholder='Mantenimiento ID (opcional)' />
-              <Input
-                value={modulos}
-                onChange={(event) => setModulos(event.target.value)}
-                placeholder='Modulos separados por coma (1 a 3)'
-              />
-            </div>
-
-            {plantillasQuery.data?.length ? (
-              <div className='rounded-xl border border-wine-100 p-3'>
-                <p className='mb-2 text-sm font-medium text-wine-900'>Plantillas automaticas disponibles</p>
-                <div className='flex flex-wrap gap-2'>
-                  {plantillasQuery.data.slice(0, 12).map((plantilla) => (
-                    <Button
-                      key={plantilla.id}
-                      variant='outline'
-                      size='sm'
-                      onClick={() => {
-                        const current = modulos
-                          .split(',')
-                          .map((item) => item.trim())
-                          .filter(Boolean);
-                        if (current.includes(plantilla.modulo) || current.length >= 3) {
-                          return;
-                        }
-                        setModulos([...current, plantilla.modulo].join(', '));
-                      }}
-                    >
-                      {plantilla.modulo}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <Input value={observaciones} onChange={(event) => setObservaciones(event.target.value)} placeholder='Observaciones' />
-            <Input value={pendientes} onChange={(event) => setPendientes(event.target.value)} placeholder='Pendientes' />
-            <Input value={recomendaciones} onChange={(event) => setRecomendaciones(event.target.value)} placeholder='Recomendaciones' />
-            <div className='flex flex-wrap gap-2'>
-              <Button
-                onClick={() => {
-                  const moduleList = modulos
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean)
-                    .slice(0, 3);
-
-                  createMutation.mutate({
-                    equipoId: equipoId ? Number(equipoId) : undefined,
-                    equipoCodigo: equipoCodigo || undefined,
-                    mantenimientoId: mantenimientoId ? Number(mantenimientoId) : undefined,
-                    modulos: moduleList,
-                    observaciones: observaciones || undefined,
-                    pendientes: pendientes || undefined,
-                    recomendaciones: recomendaciones || undefined,
-                  });
-                }}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? 'Generando...' : 'Generar informe'}
-              </Button>
-              {createMutation.isError ? (
-                <span className='text-sm text-red-600'>{(createMutation.error as Error).message}</span>
-              ) : null}
-              {createMutation.isSuccess ? <span className='text-sm text-emerald-600'>Informe generado correctamente.</span> : null}
-            </div>
-          </div>
-
-          <div className='rounded-xl border border-wine-100 bg-wine-50/30 p-3'>
-            <p className='mb-2 text-sm font-medium text-wine-900'>Plantilla automatica para el equipo seleccionado</p>
-            {previewQuery.isLoading ? <LoadingSpinner label='Generando plantilla automatica...' /> : null}
-            {previewQuery.data ? (
-              <>
-                <p className='mb-2 text-xs text-slate-600'>
-                  Hallazgos relacionados: {previewQuery.data.resumenHallazgos.total} (A {previewQuery.data.resumenHallazgos.abiertos} /
-                  P {previewQuery.data.resumenHallazgos.pendientes} / S {previewQuery.data.resumenHallazgos.solucionados})
-                </p>
-                <div className='max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-wine-100 bg-white p-3 text-xs text-slate-700'>
-                  {previewQuery.data.textoGenerado}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div className='space-y-3 rounded-xl border border-wine-100 p-3'>
-          <div className='flex flex-wrap gap-2'>
-            <Button variant={activePanel === 'hallazgos' ? 'default' : 'outline'} size='sm' onClick={() => setActivePanel('hallazgos')}>
-              Historial de hallazgos
-            </Button>
-            <Button variant={activePanel === 'informes' ? 'default' : 'outline'} size='sm' onClick={() => setActivePanel('informes')}>
-              Historial de informes
-            </Button>
-            <Button variant={activePanel === 'reportar' ? 'default' : 'outline'} size='sm' onClick={() => setActivePanel('reportar')}>
-              Reportar hallazgo
-            </Button>
-          </div>
-
-          {activePanel === 'hallazgos' ? (
-            <div className='space-y-2'>
-              {hallazgosEquipoQuery.isLoading ? <LoadingSpinner label='Cargando historial de hallazgos...' /> : null}
-              {(hallazgosEquipoQuery.data ?? []).slice(0, 8).map((item) => (
-                <div key={item.id} className='rounded-lg border border-wine-100 bg-white p-3 text-sm'>
-                  <div className='mb-1 flex items-center justify-between'>
-                    <strong>{item.modulo}</strong>
-                    <StatusBadge status={item.estado} />
-                  </div>
-                  <p className='text-slate-600'>{item.descripcionHallazgo}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {activePanel === 'informes' ? (
-            <div className='space-y-2'>
-              {historialInformesEquipo.slice(0, 8).map((item) => (
-                <div key={item.id} className='rounded-lg border border-wine-100 bg-white p-3 text-sm'>
-                  <div className='mb-1 flex items-center justify-between'>
-                    <strong>#{item.id} · {item.idEquipo ?? item.equipoCodigo ?? '-'}</strong>
-                    <span className='text-xs text-slate-500'>{formatDate(item.fechaGeneracion, 'dd/MM/yyyy HH:mm')}</span>
-                  </div>
-                  <p className='text-slate-600'>{item.modulos.join(', ')}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {activePanel === 'reportar' ? (
-            <div className='space-y-3'>
-              <select
-                value={hallazgoModulo}
-                onChange={(event) => setHallazgoModulo(event.target.value)}
-                className='h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-              >
-                <option value=''>Selecciona un modulo</option>
-                {modulosDisponibles.map((modulo) => (
-                  <option key={modulo} value={modulo}>
-                    {modulo}
-                  </option>
-                ))}
-              </select>
-              <Input value={hallazgoDescripcion} onChange={(event) => setHallazgoDescripcion(event.target.value)} placeholder='Descripcion del hallazgo' />
-              <Input value={hallazgoObservacion} onChange={(event) => setHallazgoObservacion(event.target.value)} placeholder='Observacion (opcional)' />
-              <select
-                value={hallazgoCotizacion}
-                onChange={(event) => setHallazgoCotizacion(event.target.value as 'SI' | 'NO' | 'NA')}
-                className='h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-              >
-                <option value='SI'>Cotizacion: SI</option>
-                <option value='NO'>Cotizacion: NO</option>
-                <option value='NA'>Cotizacion: NA</option>
-              </select>
-              <select
-                value={hallazgoEstado}
-                onChange={(event) => setHallazgoEstado(event.target.value as 'ABIERTO' | 'PENDIENTE' | 'SOLUCIONADO')}
-                className='h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-              >
-                <option value='ABIERTO'>Estado: ABIERTO</option>
-                <option value='PENDIENTE'>Estado: PENDIENTE</option>
-                <option value='SOLUCIONADO'>Estado: SOLUCIONADO</option>
-              </select>
-              <Button
-                onClick={() => {
-                  if (!canSubmitHallazgo) {
-                    return;
-                  }
-
-                  reportHallazgoMutation.mutate({
-                    equipoId: equipoCodigo,
-                    tipoMantenimiento: 'PREVENTIVO',
-                    modulo: hallazgoModulo,
-                    descripcionHallazgo: hallazgoDescripcion,
-                    cotizacion: hallazgoCotizacion,
-                    observacion: hallazgoObservacion || undefined,
-                    estado: hallazgoEstado,
-                    fechaHallazgo: new Date().toISOString().slice(0, 10),
-                  });
-                }}
-                disabled={reportHallazgoMutation.isPending || !canSubmitHallazgo}
-              >
-                {reportHallazgoMutation.isPending ? 'Reportando...' : 'Reportar hallazgo'}
-              </Button>
-              {!canSubmitHallazgo ? (
-                <span className='text-xs text-slate-500'>Completa equipo codigo, modulo y descripcion para reportar.</span>
-              ) : null}
-              {reportHallazgoMutation.isError ? (
-                <span className='text-sm text-red-600'>{(reportHallazgoMutation.error as Error).message}</span>
-              ) : null}
-              {reportHallazgoMutation.isSuccess ? <span className='text-sm text-emerald-600'>Hallazgo reportado correctamente.</span> : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className='grid gap-3 rounded-2xl border border-wine-100 bg-white p-4 md:grid-cols-2'>
-        <SearchBar value={search} onChange={setSearch} placeholder='Buscar por equipo o tecnico...' />
-        <SearchBar value={estado} onChange={setEstado} placeholder='Filtrar por estado...' />
-      </div>
-
-      {query.isLoading ? <LoadingSpinner label='Cargando informes...' /> : null}
-      {query.isError ? <EmptyState title='Error al cargar informes' description='No fue posible obtener los informes.' /> : null}
-      {!query.isLoading && !query.isError ? <DataTable columns={columns} data={filtered} searchPlaceholder='Buscar en la tabla...' /> : null}
-    </section>
+    <ReportGeneratorDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) {
+          setSelectedEquipo(null);
+          setManualLookupError('');
+        }
+      }}
+      equipo={selectedEquipo}
+      hallazgos={hallazgosQuery.data ?? []}
+      plantillas={plantillasQuery.data ?? []}
+    />
   );
 }

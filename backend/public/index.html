@@ -604,8 +604,7 @@
               <p class="small-note">Selecciona entre 1 y 3 modulos para generar el borrador.</p>
               <textarea id="iObservaciones" class="report-text" placeholder="Texto del informe editable"></textarea>
               <div class="grid-2">
-                <textarea id="iPendientes" placeholder="Pendientes"></textarea>
-                <textarea id="iRecomendaciones" placeholder="Recomendaciones"></textarea>
+                <textarea id="iPendientes" placeholder="Pendientes (autocompletado con hallazgos de los ultimos 5 meses)"></textarea>
               </div>
               <div class="grid-2">
                 <button id="btnInformePreview" class="ghost" type="button">Generar borrador</button>
@@ -678,7 +677,6 @@
       const iModulosChecklist = document.getElementById('iModulosChecklist');
       const iObservaciones = document.getElementById('iObservaciones');
       const iPendientes = document.getElementById('iPendientes');
-      const iRecomendaciones = document.getElementById('iRecomendaciones');
       const btnInformePreview = document.getElementById('btnInformePreview');
       const btnInformeGuardar = document.getElementById('btnInformeGuardar');
       const btnInformeListar = document.getElementById('btnInformeListar');
@@ -918,7 +916,6 @@
         if (includeObservaciones) {
           payload.observaciones = iObservaciones.value.trim();
           payload.pendientes = iPendientes.value.trim();
-          payload.recomendaciones = iRecomendaciones.value.trim();
         }
 
         return payload;
@@ -987,11 +984,9 @@
         }
 
         const pendientes = String(item.pendientes || '').trim();
-        const recomendaciones = String(item.recomendaciones || '').trim();
         const blocks = [
           String(item.observaciones || '').trim(),
           pendientes ? `Pendientes:\n${pendientes}` : '',
-          recomendaciones ? `Recomendaciones:\n${recomendaciones}` : '',
         ].filter(Boolean);
 
         informeDetalleTexto.value = blocks.join('\n\n');
@@ -1457,7 +1452,6 @@
         iEquipoProgramado.innerHTML = '<option value="">Selecciona equipo programado del dia</option>';
         iObservaciones.value = '';
         iPendientes.value = '';
-        iRecomendaciones.value = '';
         Array.from(iModulosChecklist.querySelectorAll('input[data-role="informe-modulo"]')).forEach((item) => {
           item.checked = false;
         });

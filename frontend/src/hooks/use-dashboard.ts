@@ -17,7 +17,7 @@ export function useEquiposProgramados(fechaIso: string, search = '') {
 export function useEquiposFullText(fechaIso: string, search: string) {
   const query = useQuery({
     queryKey: ['equipos-busqueda', fechaIso, search],
-    queryFn: () => fetchEquiposProgramados(fechaIso, search),
+    queryFn: () => fetchEquiposProgramados(fechaIso, search, true),
     retry: 2,
   });
 
@@ -30,7 +30,7 @@ export function useEquiposFullText(fechaIso: string, search: string) {
     }
 
     return base.filter((item) => {
-      const haystack = [item.nombreEquipo, item.idEquipo, item.rutaNumero ?? '', item.ubicacion ?? ''].map(normalizeText);
+      const haystack = [item.nombreEquipo, item.idEquipo, item.rutaNumero ?? '', item.ubicacion ?? '', item.direccion ?? ''].map(normalizeText);
       return haystack.some((part) => part.includes(term));
     });
   }, [query.data?.equipos, search]);

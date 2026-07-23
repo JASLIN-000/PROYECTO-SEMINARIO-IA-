@@ -23,6 +23,9 @@ export class Informe {
   @Column('text', { nullable: true })
   recomendaciones!: string | null;
 
+  @Column({ type: 'varchar', length: 20, default: 'PENDIENTE' })
+  estado!: string;
+
   @Column({ name: 'fecha_generacion', type: 'timestamp', default: () => 'NOW()' })
   fechaGeneracion!: Date;
 

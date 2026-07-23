@@ -20,6 +20,8 @@ export type HallazgosFilters = {
   nombreEquipo?: string;
 };
 
+export type UpdateHallazgoEstado = 'ABIERTO' | 'PENDIENTE' | 'SOLUCIONADO';
+
 export async function fetchHallazgos(filters: HallazgosFilters) {
   const params = new URLSearchParams();
 
@@ -45,5 +47,16 @@ export async function fetchHallazgos(filters: HallazgosFilters) {
 
 export async function createHallazgo(payload: CreateHallazgoPayload) {
   const { data } = await apiClient.post<Hallazgo>('/hallazgos', payload);
+  return data;
+}
+
+export async function updateHallazgoEstado(id: number, estado: UpdateHallazgoEstado) {
+  const payload: { estado: UpdateHallazgoEstado; fechaSolucion?: string } = { estado };
+
+  if (estado === 'SOLUCIONADO') {
+    payload.fechaSolucion = new Date().toISOString().slice(0, 10);
+  }
+
+  const { data } = await apiClient.patch<Hallazgo>(`/hallazgos/${id}`, payload);
   return data;
 }

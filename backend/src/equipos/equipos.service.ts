@@ -15,6 +15,11 @@ type MaintenanceSlot = {
   horaProgramada: string;
 };
 
+const DEFAULT_TECNICO = 'Sergio Ramos';
+const DEFAULT_INGENIERO = 'William Hernandez';
+const DEFAULT_EJECUTIVA = 'Ivon Martinez';
+const DEFAULT_TIPO_CONTRATO = 'A';
+
 @Injectable()
 export class EquiposService {
   private schemaReady?: Promise<void>;
@@ -25,7 +30,7 @@ export class EquiposService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(q?: string, rutaNumero?: string, fecha?: string) {
+  async findAll(q?: string, rutaNumero?: string, fecha?: string, todos?: string) {
     await this.ensureSchema();
     await this.normalizeActiveServiceDayIndexes();
 
@@ -33,6 +38,29 @@ export class EquiposService {
     const holidays = await loadConfiguredHolidaySet(targetDate);
     const calendario = getBusinessDayContext(targetDate, holidays);
     const normalizedRoute = rutaNumero?.trim().toLowerCase();
+    const includeAll = this.parseBooleanFlag(todos);
+
+    if (includeAll) {
+      const equipos = await this.loadActiveEquipos(normalizedRoute, q);
+      const slots = this.buildMaintenanceSlots(equipos.length, targetDate);
+
+      return {
+        ok: true,
+        mensaje: equipos.length
+          ? 'Equipos activos cargados correctamente.'
+          : 'No existen equipos activos con los filtros aplicados.',
+        calendario,
+        equipos: equipos.map((equipo, index) => {
+          const slot = slots[index] ?? {
+            horaInicio: null,
+            horaFin: null,
+            horaProgramada: null,
+          };
+
+          return this.toEquipoResponse(equipo, slot);
+        }),
+      };
+    }
 
     if (!calendario.isBusinessDay) {
       return {
@@ -66,18 +94,29 @@ export class EquiposService {
           horaProgramada: null,
         };
 
-        return {
-          ...slot,
-        horaAlmuerzo: '12:00 - 13:00',
-        id: equipo.id,
-        idEquipo: equipo.idEquipo,
-        nombreEquipo: equipo.nombreEquipo,
-        acuerdoNivelServicioDh: equipo.acuerdoNivelServicioDh,
-        estado: equipo.estado,
-        rutaNumero: equipo.rutaNumero ?? null,
-        historialHallazgosUrl: `/hallazgos?equipoId=${equipo.id}`,
-        };
+        return this.toEquipoResponse(equipo, slot);
       }),
+    };
+  }
+
+  private toEquipoResponse(equipo: Equipo, slot: MaintenanceSlot | { horaInicio: null; horaFin: null; horaProgramada: null }) {
+    return {
+      ...slot,
+      horaAlmuerzo: '12:00 - 13:00',
+      id: equipo.id,
+      idEquipo: equipo.idEquipo,
+      nombreEquipo: equipo.nombreEquipo,
+      acuerdoNivelServicioDh: equipo.acuerdoNivelServicioDh,
+      estado: equipo.estado,
+      rutaNumero: equipo.rutaNumero ?? null,
+      direccion: equipo.direccion ?? (equipo.rutaNumero ? `Ruta ${equipo.rutaNumero}` : 'Sin direccion registrada'),
+      ultimoMantenimiento: equipo.ultimoMantenimiento ?? 'No disponible',
+      proximoMantenimiento: equipo.proximoMantenimiento ?? 'Pendiente',
+      tecnicoResponsable: equipo.tecnicoResponsable ?? DEFAULT_TECNICO,
+      ingenieroResponsable: equipo.ingenieroResponsable ?? DEFAULT_INGENIERO,
+      ejecutivaCuenta: equipo.ejecutivaCuenta ?? DEFAULT_EJECUTIVA,
+      tipoContrato: equipo.tipoContrato ?? DEFAULT_TIPO_CONTRATO,
+      historialHallazgosUrl: `/hallazgos?equipoId=${equipo.id}`,
     };
   }
 
@@ -174,11 +213,21 @@ export class EquiposService {
     normalizedRoute?: string,
     q?: string,
   ) {
-    const query = this.equiposRepository.createQueryBuilder('equipo');
-    query.where('UPPER(equipo.estado) = :estado', { estado: 'ACTIVO' });
+    const query = this.buildActiveEquiposBaseQuery(normalizedRoute, q);
     query.andWhere('equipo.acuerdoNivelServicioDh = :businessDayIndex', {
       businessDayIndex,
     });
+
+    return query.orderBy('equipo.nombreEquipo', 'ASC').getMany();
+  }
+
+  private async loadActiveEquipos(normalizedRoute?: string, q?: string) {
+    return this.buildActiveEquiposBaseQuery(normalizedRoute, q).orderBy('equipo.nombreEquipo', 'ASC').getMany();
+  }
+
+  private buildActiveEquiposBaseQuery(normalizedRoute?: string, q?: string) {
+    const query = this.equiposRepository.createQueryBuilder('equipo');
+    query.where('UPPER(equipo.estado) = :estado', { estado: 'ACTIVO' });
 
     if (normalizedRoute) {
       query.andWhere('LOWER(equipo.rutaNumero) = :rutaNumero', { rutaNumero: normalizedRoute });
@@ -192,7 +241,12 @@ export class EquiposService {
       );
     }
 
-    return query.orderBy('equipo.nombreEquipo', 'ASC').getMany();
+    return query;
+  }
+
+  private parseBooleanFlag(value?: string) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'si' || normalized === 'yes';
   }
 
   private async normalizeActiveServiceDayIndexes() {
@@ -241,6 +295,13 @@ export class EquiposService {
       this.schemaReady = this.dataSource
         .query(`
           ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ruta_numero VARCHAR(20);
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS direccion VARCHAR(255);
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ultimo_mantenimiento DATE;
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS proximo_mantenimiento DATE;
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tecnico_responsable VARCHAR(120);
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ingeniero_responsable VARCHAR(120);
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ejecutiva_cuenta VARCHAR(120);
+          ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo_contrato VARCHAR(5);
           CREATE INDEX IF NOT EXISTS idx_equipos_ruta_numero ON equipos(ruta_numero);
 
           DO $$

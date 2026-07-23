@@ -5,7 +5,6 @@ import {
   LogOut,
   Search,
   FileText,
-  Settings,
   ShieldCheck,
   TriangleAlert,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ const navItems = [
   { to: '/hallazgos', label: 'Hallazgos', icon: TriangleAlert },
   { to: '/informes', label: 'Informes', icon: FileText },
   { to: '/historial', label: 'Historial', icon: Clock3 },
-  { to: '/configuracion', label: 'Configuracion', icon: Settings },
 ];
 
 type Props = {

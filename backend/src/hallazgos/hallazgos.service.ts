@@ -287,7 +287,7 @@ export class HallazgosService {
 
     if (payload.estado !== undefined) {
       const estado = String(payload.estado).trim().toUpperCase();
-      const normalizedEstado = estado === 'CERRADO' ? 'SOLUCIONADO' : estado;
+      const normalizedEstado = estado === 'CERRADO' ? 'SOLUCIONADO' : (estado === 'PROCESO' ? 'PENDIENTE' : estado);
       normalized.estado = ['ABIERTO', 'PENDIENTE', 'SOLUCIONADO'].includes(normalizedEstado)
         ? normalizedEstado
         : 'ABIERTO';

@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarClock, Hammer, MapPin, ScanSearch } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/page-header';
 import { SearchBar } from '@/components/search-bar';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -10,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/empty-state';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { StatusBadge } from '@/components/status-badge';
-import { useBusinessCalendarMonth, useEquiposFullText, useHallazgos, useInformes } from '@/hooks/use-dashboard';
+import { useEquiposFullText, useHallazgos, useInformes } from '@/hooks/use-dashboard';
 import type { Equipo } from '@/types/domain';
 import { toIsoDate } from '@/utils/business-days';
 
@@ -20,23 +19,8 @@ export function SearchEquiposPage() {
   const [selected, setSelected] = useState<Equipo | null>(null);
   const todayIso = toIsoDate(new Date());
   const query = useEquiposFullText(todayIso, search);
-  const businessCalendarQuery = useBusinessCalendarMonth(todayIso);
   const hallazgosQuery = useHallazgos({});
   const informesQuery = useInformes();
-
-  const scheduledDates = useMemo(() => {
-    if (!selected?.acuerdoNivelServicioDh || !businessCalendarQuery.data?.diasHabiles?.length) {
-      return [] as Date[];
-    }
-
-    const index = selected.acuerdoNivelServicioDh - 1;
-    const isoDate = businessCalendarQuery.data.diasHabiles[index];
-    if (!isoDate) {
-      return [] as Date[];
-    }
-
-    return [new Date(`${isoDate}T12:00:00-05:00`)];
-  }, [businessCalendarQuery.data?.diasHabiles, selected?.acuerdoNivelServicioDh]);
 
   const selectedMetrics = useMemo(() => {
     if (!selected) {
@@ -81,25 +65,25 @@ export function SearchEquiposPage() {
 
       {!query.isLoading && !query.isError ? (
         query.equipos.length ? (
-          <div className='grid gap-3 md:grid-cols-2'>
+          <div className='space-y-3'>
             {query.equipos.map((equipo) => (
               <Card key={equipo.id} className='border-wine-100'>
-                <CardContent className='space-y-4 p-4'>
-                  <div className='flex items-start justify-between'>
-                    <div>
+                <CardContent className='p-4'>
+                  <div className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between'>
+                    <div className='min-w-0'>
                       <h3 className='font-display font-semibold text-wine-900'>{equipo.nombreEquipo}</h3>
                       <p className='text-sm text-slate-500'>{equipo.idEquipo}</p>
                     </div>
-                    <StatusBadge status={equipo.estado} />
+                    <div className='flex flex-wrap items-center gap-3'>
+                      <p className='flex items-center gap-2 text-sm text-slate-600'>
+                        <MapPin className='h-4 w-4 text-wine-700' /> Ruta: {equipo.rutaNumero ?? '-'}
+                      </p>
+                      <StatusBadge status={equipo.estado} />
+                      <Button variant='outline' size='sm' onClick={() => setSelected(equipo)}>
+                        Ver informacion
+                      </Button>
+                    </div>
                   </div>
-
-                  <p className='flex items-center gap-2 text-sm text-slate-600'>
-                    <MapPin className='h-4 w-4 text-wine-700' /> Ruta: {equipo.rutaNumero ?? '-'}
-                  </p>
-
-                  <Button variant='outline' size='sm' onClick={() => setSelected(equipo)}>
-                    Ver informacion
-                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -118,36 +102,45 @@ export function SearchEquiposPage() {
                 <p className='text-sm text-slate-500'>Codigo: {selected.idEquipo}</p>
               </div>
 
-              <div className='grid gap-3 text-sm text-slate-600'>
-                <p className='flex items-center gap-2'>
+              <ul className='grid gap-3 text-sm text-slate-600'>
+                <li className='flex items-center gap-2'>
                   <ScanSearch className='h-4 w-4 text-wine-700' /> Modelo: {selected.modelo ?? 'No disponible'}
-                </p>
-                <p className='flex items-center gap-2'>
-                  <MapPin className='h-4 w-4 text-wine-700' /> Ubicacion: {selected.ubicacion ?? `Ruta ${selected.rutaNumero ?? '-'}`}
-                </p>
-                <p className='flex items-center gap-2'>
+                </li>
+                <li className='flex items-center gap-2'>
+                  <MapPin className='h-4 w-4 text-wine-700' /> Direccion: {selected.direccion ?? selected.ubicacion ?? `Ruta ${selected.rutaNumero ?? '-'}`}
+                </li>
+                <li className='flex items-center gap-2'>
                   <Hammer className='h-4 w-4 text-wine-700' /> Ultimo mantenimiento: {selected.ultimoMantenimiento ?? 'No disponible'}
-                </p>
-                <p className='flex items-center gap-2'>
+                </li>
+                <li className='flex items-center gap-2'>
                   <CalendarClock className='h-4 w-4 text-wine-700' /> Proximo mantenimiento: {selected.proximoMantenimiento ?? 'Pendiente'}
-                </p>
-                <p>
+                </li>
+                <li>
+                  <strong>Tecnico:</strong> {selected.tecnicoResponsable ?? 'Sergio Ramos'}
+                </li>
+                <li>
+                  <strong>Ingeniero:</strong> {selected.ingenieroResponsable ?? 'William Hernandez'}
+                </li>
+                <li>
+                  <strong>Ejecutiva de cuenta:</strong> {selected.ejecutivaCuenta ?? 'Ivon Martinez'}
+                </li>
+                <li>
+                  <strong>Tipo de contrato:</strong> {selected.tipoContrato ?? 'A'}
+                </li>
+                <li>
+                  <strong>Administracion:</strong> {selected.administracion ?? ''}
+                </li>
+                <li>
+                  <strong>Numero de contacto:</strong> {selected.numeroContacto ?? ''}
+                </li>
+                <li>
                   <strong>Hora de almuerzo:</strong> {selected.horaAlmuerzo ?? '12:00 - 13:00'}
-                </p>
-                <p>Hallazgos abiertos: {selectedMetrics.abiertos}</p>
-                <p>Hallazgos pendientes: {selectedMetrics.pendientes}</p>
-                <p>Hallazgos solucionados: {selectedMetrics.solucionados}</p>
-                <p>Mantenimientos realizados: {selectedMetrics.mantenimientosRealizados}</p>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Calendario mensual</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Calendar mode='multiple' selected={scheduledDates} />
-                </CardContent>
-              </Card>
+                </li>
+                <li>Hallazgos abiertos: {selectedMetrics.abiertos}</li>
+                <li>Hallazgos pendientes: {selectedMetrics.pendientes}</li>
+                <li>Hallazgos solucionados: {selectedMetrics.solucionados}</li>
+                <li>Mantenimientos realizados: {selectedMetrics.mantenimientosRealizados}</li>
+              </ul>
 
               <Button
                 onClick={() => {
