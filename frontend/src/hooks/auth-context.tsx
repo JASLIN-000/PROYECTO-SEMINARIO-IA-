@@ -1,3 +1,4 @@
+/* oxlint-disable react/only-export-components */
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { AuthUser, LoginPayload } from '@/types/auth';
 import { login as loginService } from '@/services/auth.service';

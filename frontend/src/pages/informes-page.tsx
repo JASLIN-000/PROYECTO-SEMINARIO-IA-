@@ -15,6 +15,9 @@ import { fetchEquiposProgramados } from '@/services/equipos.service';
 import { fetchPlantillas } from '@/services/informes.service';
 import type { Equipo } from '@/types/domain';
 
+const EMPTY_EQUIPOS: Equipo[] = [];
+const EMPTY_INFORMES: ReturnType<typeof useInformes> extends { data: infer T } ? NonNullable<T> : never = [];
+
 export function InformesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,7 +37,7 @@ export function InformesPage() {
     queryFn: () => fetchEquiposProgramados(undefined, undefined, true),
     retry: 2,
   });
-  const equiposCatalog = equiposQuery.data?.equipos ?? [];
+  const equiposCatalog = useMemo(() => equiposQuery.data?.equipos ?? EMPTY_EQUIPOS, [equiposQuery.data?.equipos]);
   const hallazgosQuery = useHallazgos({});
   const informesQuery = useInformes();
   const plantillasQuery = useQuery({
@@ -89,7 +92,7 @@ export function InformesPage() {
     return getErrorMessage(sourceError, 'No fue posible cargar el workspace de informes.');
   }, [equiposQuery.error, hallazgosQuery.error, informesQuery.error, plantillasQuery.error]);
 
-  const informes = informesQuery.data ?? [];
+  const informes = useMemo(() => informesQuery.data ?? EMPTY_INFORMES, [informesQuery.data]);
 
   const filteredInformes = useMemo(() => {
     const term = normalizeText(reportSearch);

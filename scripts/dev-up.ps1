@@ -129,7 +129,29 @@ if (-not $SkipSmokeTests) {
     $smoke.health = [ordered]@{ status = 0; ok = $false; error = $_.Exception.Message }
   }
 
-  $loginBody = @{ usuario = 'tecnico.demo@trazaDH.com'; password = 'trazaDH1010'; rutaNumero = 'R1' } | ConvertTo-Json
+  $smokeCreds = $null
+  try {
+    $smokeCredsRaw = & node (Join-Path $backendPath 'scripts/ensure-smoke-user.js')
+    if ($LASTEXITCODE -eq 0 -and $smokeCredsRaw) {
+      $smokeCreds = $smokeCredsRaw | ConvertFrom-Json
+    }
+  } catch {
+    Write-Host "[dev-up] Could not provision smoke user: $($_.Exception.Message)"
+  }
+
+  if (-not $smokeCreds) {
+    $smokeCreds = [pscustomobject]@{
+      usuario = 'tecnico.demo@trazadh.com'
+      password = 'trazaDH1010'
+      rutaNumero = 'R1'
+    }
+  }
+
+  $loginBody = @{
+    usuario = $smokeCreds.usuario
+    password = $smokeCreds.password
+    rutaNumero = $smokeCreds.rutaNumero
+  } | ConvertTo-Json
   try {
     $login = Invoke-WebRequest -Uri 'http://localhost:3000/auth/login' -Method Post -ContentType 'application/json' -Body $loginBody -UseBasicParsing -TimeoutSec 10
     $smoke.login = [ordered]@{ status = [int]$login.StatusCode; ok = ($login.StatusCode -eq 201 -or $login.StatusCode -eq 200) }
