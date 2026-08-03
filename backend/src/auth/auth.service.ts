@@ -6,6 +6,7 @@ import { LoginDto } from '../common/dto/login.dto';
 import { Equipo } from '../common/entities/equipo.entity';
 import { TecnicoAcceso } from '../common/entities/tecnico-acceso.entity';
 import { getBusinessDayContext, loadConfiguredHolidaySet } from '../common/utils/business-days';
+import { issueAuthToken, type AuthSession } from './auth-token';
 
 @Injectable()
 export class AuthService {
@@ -96,9 +97,22 @@ export class AuthService {
       }
     }
 
+    const session = issueAuthToken({
+      sub: tecnico.id,
+      usuario: tecnico.usuario,
+      cedula: tecnico.cedula,
+      nombre: tecnico.nombre,
+      rutaNumero: effectiveRutaNumero,
+      tokenVersion: Number(tecnico.tokenVersion || 1),
+    });
+
     return {
       ok: true,
       mensaje,
+      token: session.token,
+      tokenType: 'Bearer',
+      expiresAt: session.expiresAt,
+      expiresIn: session.expiresIn,
       tecnico: {
         id: tecnico.id,
         usuario: tecnico.usuario,
@@ -115,6 +129,29 @@ export class AuthService {
         estado: equipo.estado,
         rutaNumero: equipo.rutaNumero ?? null,
       })),
+    };
+  }
+
+  async logout(session: AuthSession) {
+    await this.ensureSchema();
+
+    const result = await this.dataSource.query(
+      `
+        UPDATE tecnicos_acceso
+        SET token_version = COALESCE(token_version, 1) + 1
+        WHERE id = $1
+        RETURNING id
+      `,
+      [session.sub],
+    );
+
+    if (!Array.isArray(result) || !result.length) {
+      throw new UnauthorizedException('Sesion invalida.');
+    }
+
+    return {
+      ok: true,
+      mensaje: 'Sesion cerrada correctamente.',
     };
   }
 
@@ -188,6 +225,7 @@ export class AuthService {
           );
 
           ALTER TABLE tecnicos_acceso ADD COLUMN IF NOT EXISTS usuario VARCHAR(120);
+          ALTER TABLE tecnicos_acceso ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1;
 
           CREATE INDEX IF NOT EXISTS idx_tecnicos_acceso_ruta_numero ON tecnicos_acceso(ruta_numero);
         `)
@@ -247,6 +285,7 @@ export class AuthService {
                 rutaNumero: process.env.AUTH_DEFAULT_RUTA || 'R1',
                 passwordHash: this.hashPassword(defaultPassword),
                 activo: true,
+                tokenVersion: 1,
               }),
             );
           }

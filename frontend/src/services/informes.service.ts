@@ -1,5 +1,5 @@
 import { apiClient } from '@/api/client';
-import type { Informe, InformePreview, Plantilla } from '@/types/domain';
+import type { Informe, InformePreview, InformeSemanal, Plantilla } from '@/types/domain';
 
 export type CreateInformePayload = {
   mantenimientoId?: number;
@@ -41,6 +41,56 @@ export async function createInforme(payload: CreateInformePayload) {
 
 export async function finalizeInforme(id: number) {
   const { data } = await apiClient.patch<Informe>(`/informes/${id}/finalizar`);
+  return data;
+}
+
+export async function fetchInformesSemanales() {
+  const { data } = await apiClient.get<InformeSemanal[]>('/informes/semanales');
+  return data;
+}
+
+export async function generateInformeSemanal(force = false) {
+  const { data } = await apiClient.post<InformeSemanal>(`/informes/semanales/generar?force=${force ? 'true' : 'false'}`);
+  return data;
+}
+
+export async function downloadInformeSemanalPdf(id: number) {
+  const response = await apiClient.get<Blob>(`/informes/semanales/${id}/pdf`, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `informe-semanal-${id}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function openInformeSemanalPdfPreview(id: number) {
+  const response = await apiClient.get<Blob>(`/informes/semanales/${id}/pdf-preview`, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 60_000);
+}
+
+export async function sendInformeSemanalByEmail(
+  id: number,
+  payload: { to: string; subject?: string; message?: string },
+) {
+  const { data } = await apiClient.post<{ ok: boolean; mensaje: string; informeId: number; destino: string }>(
+    `/informes/semanales/${id}/enviar-correo`,
+    payload,
+  );
+
   return data;
 }
 

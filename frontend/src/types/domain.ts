@@ -3,6 +3,9 @@ export type BackendCalendarContext = {
   isoDate?: string;
   dateIso?: string;
   isBusinessDay: boolean;
+  isOperationalDay?: boolean;
+  operationalLabel?: string;
+  operationalSaturdayWeeks?: number[];
   businessDayIndex: number | null;
   businessDaysInMonth?: number;
   monthStartIso?: string;
@@ -66,6 +69,18 @@ export type Hallazgo = {
   nombreEquipo: string | null;
 };
 
+export type Solicitud = {
+  idSolicitud: number;
+  idHallazgo: number;
+  idEquipo: number;
+  tipoSolicitud: 'COTIZACION' | 'PEDIDO' | string;
+  fechaCreacion: string;
+  usuarioSolicitante: string;
+  estado: 'GENERADA' | 'ENVIADA' | 'ATENDIDA' | 'CERRADA' | string;
+  urlFormulario: string;
+  fechaAperturaFormulario: string | null;
+};
+
 export type Informe = {
   id: number;
   mantenimientoId: number | null;
@@ -105,4 +120,28 @@ export type Plantilla = {
   id: number;
   modulo: string;
   observacionEstandar: string;
+};
+
+export type InformeSemanal = {
+  id: number;
+  semanaInicio: string;
+  semanaFin: string;
+  tecnicoScope: string;
+  estado: string;
+  fechaGeneracion: string;
+  resumenEjecutivo: string | null;
+  pdf: {
+    nombreArchivo: string;
+    descargaUrl: string;
+  };
+  hallazgosReportados?: Array<{
+    id: number;
+    fecha: string;
+    equipoCodigo: string;
+    equipoNombre: string;
+    modulo: string;
+    estado: string;
+    descripcion: string;
+  }>;
+  accion?: 'generado' | 'reutilizado' | string;
 };

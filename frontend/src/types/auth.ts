@@ -15,5 +15,9 @@ export type AuthUser = {
 export type LoginResponse = {
   ok: boolean;
   mensaje: string;
+  token: string;
+  tokenType: 'Bearer';
+  expiresAt: string;
+  expiresIn: number;
   tecnico: AuthUser;
 };

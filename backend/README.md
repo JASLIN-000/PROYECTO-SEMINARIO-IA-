@@ -103,3 +103,53 @@ $body = @{
 
 Invoke-RestMethod http://localhost:3000/hallazgos/1 -Method Patch -ContentType 'application/json' -Body $body
 ```
+
+## Reinicio y carga semanal de hallazgos
+
+Para iniciar una nueva semana sin datos historicos en hallazgos/reportes:
+
+```bash
+npm run hallazgos:reset-semana
+```
+
+Para cargar hallazgos desde archivo JSON:
+
+```bash
+npm run hallazgos:cargar-semana
+```
+
+Archivo por defecto de carga:
+
+- `data/hallazgos-carga-semana.json`
+
+Formato esperado:
+
+```json
+{
+	"hallazgos": [
+		{
+			"equipoId": 1,
+			"mantenimientoId": 10,
+			"tipoMantenimiento": "PREVENTIVO",
+			"modulo": "SISTEMA ELECTRIFICACION",
+			"descripcionHallazgo": "Ruido intermitente en tablero de control",
+			"cotizacion": "SI",
+			"observacion": "Se requiere revision de contactores",
+			"estado": "ABIERTO",
+			"fechaHallazgo": "2026-08-03",
+			"fechaSolucion": null
+		}
+	]
+}
+```
+
+Notas:
+
+- `equipoId` o `codigoEquipo` es obligatorio en cada registro.
+- Si no envias `fechaHallazgo`, se usa la fecha actual.
+- Por defecto el script exige fecha dentro de la semana actual (lunes a domingo).
+- Para permitir fechas fuera de semana actual, usa:
+
+```bash
+node ./scripts/cargar-hallazgos-semana.js --allow-outside-week
+```

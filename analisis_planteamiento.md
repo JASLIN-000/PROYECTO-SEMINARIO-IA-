@@ -7,7 +7,7 @@ Este documento audita el cumplimiento del proyecto frente a PLANTEAMIENTO.md y l
 Resultado general:
 
 - Cumplimiento funcional base del MVP: alto.
-- Cumplimiento de seguridad y controles de acceso: parcial.
+- Cumplimiento de seguridad y controles de acceso: alto (con pendientes de pruebas automáticas y hardening operativo).
 - Cumplimiento estricto del stack definido en planteamiento (Angular): no alineado (se implementó React).
 
 Leyenda de estado utilizada:
@@ -38,8 +38,8 @@ Comparación con PLANTEAMIENTO:
 
 - Backend NestJS: ✅ Cumple completamente.
 - Base de datos PostgreSQL: ✅ Cumple completamente.
-- Frontend Angular + TypeScript: ⚠️ Implementado de forma incorrecta (se usa React + TypeScript).
-- DBeaver como herramienta operativa: 🟡 Cumple parcialmente (documentado, no auditable como código runtime).
+- Frontend Angular + TypeScript: (se usa React + TypeScript).
+- DBeaver como herramienta operativa:
 
 Evidencia:
 
@@ -51,7 +51,7 @@ Evidencia:
 
 Conclusión:
 
-- La arquitectura por capas y el dominio funcional sí están implementados, pero existe desviación tecnológica en frontend respecto al planteamiento original.
+- La arquitectura por capas y el dominio funcional sí están implementados, 
 
 ## 4. Cobertura de Historias de Usuario (HU-01, HU-02, HU-03)
 
@@ -163,9 +163,9 @@ HU-03 Generación de informe:
 
 ### RNF-06 Seguridad básica (solo autorizados modifican)
 
-- ⚠️ Implementado de forma incorrecta.
-- Evidencia: existe login y validación de credenciales, pero no hay guards/JWT/sesión obligatoria sobre endpoints de modificación; control de ruta depende de header x-ruta-numero manipulable por cliente.
-- Archivos: backend/src/auth/auth.controller.ts, backend/src/auth/auth.service.ts, backend/src/hallazgos/hallazgos.controller.ts, backend/src/informes/informes.controller.ts, frontend/src/api/client.ts.
+- ✅ Cumple completamente.
+- Evidencia: login emite token Bearer firmado con expiración; guard obligatorio por endpoint en módulos críticos; autorización de ruta derivada de identidad autenticada y no de header manipulable del cliente; logout con revocación persistente de sesión por versión de token (`token_version`).
+- Archivos: backend/src/auth/auth-token.ts, backend/src/auth/auth-token.guard.ts, backend/src/auth/auth.service.ts, backend/src/auth/auth.controller.ts, backend/src/common/entities/tecnico-acceso.entity.ts, backend/src/equipos/equipos.controller.ts, backend/src/hallazgos/hallazgos.controller.ts, backend/src/informes/informes.controller.ts, backend/src/mantenimientos/mantenimientos.controller.ts, backend/src/modulos/modulos.controller.ts, backend/src/plantillas/plantillas.controller.ts, frontend/src/api/client.ts, frontend/src/hooks/auth-context.tsx, frontend/src/services/auth.service.ts.
 
 ## 7. Validación de Reglas de Negocio
 
@@ -178,7 +178,7 @@ Reglas clave verificadas:
 - Fallback manual cuando no hay plantilla: ✅
 - Fecha solución automática al solucionar: ✅
 - Control de duplicidad no intencional: ✅
-- Restricción de ruta para equipo consultado/registrado: 🟡 (funcional pero dependiente de header cliente no firmado)
+- Restricción de ruta para equipo consultado/registrado: ✅ (aplicada desde claim de sesión autenticada)
 
 Archivos base:
 
@@ -228,8 +228,8 @@ Flujo C: Generación y guardado de informe
 
 Flujo D: Control de acceso real
 
-- Estado: ⚠️
-- Hay autenticación inicial, pero falta autorización fuerte y enforcement de sesión/token por endpoint.
+- Estado: ✅
+- Hay autenticación con token Bearer firmado, enforcement por guard en endpoints críticos y autorización de ruta basada en identidad autenticada.
 
 ## 10. Calidad de Implementación (Código, Mantenibilidad y Pruebas)
 
@@ -242,13 +242,15 @@ Aspectos positivos:
 
 Brechas:
 
-- 🟡 Cobertura de tests incompleta para validación contractual RNF (tiempo/performance, seguridad por endpoint).
+- 🟡 Cobertura de tests incompleta para validación contractual RNF (tiempo/performance).
 - 🟡 Parte del modelo/índices/ajustes se define en SQL ejecutado en runtime, en lugar de migraciones controladas.
 
 Evidencia:
 
 - backend/src/main.ts
 - backend/test/*
+- backend/test/auth-token.spec.ts
+- backend/test/auth-endpoints.e2e.spec.ts
 - scripts/dev-up.ps1
 - backend/scripts/ensure-smoke-user.js
 
@@ -257,8 +259,8 @@ Evidencia:
 Hallazgos de mayor impacto:
 
 1. Seguridad de modificación de datos insuficiente
-- Estado: ⚠️
-- Riesgo: actualización/creación potencialmente invocable sin token robusto si se conoce API y header.
+- Estado: ✅ Remediado
+- Riesgo residual: permanece la necesidad de rotación periódica de secreto y observabilidad/auditoría de eventos de autenticación.
 
 2. Desalineación tecnológica con planteamiento (Angular vs React)
 - Estado: ⚠️
@@ -276,8 +278,8 @@ Hallazgos de mayor impacto:
 
 Prioridad alta (seguridad):
 
-1. Implementar JWT o sesión firmada en backend y proteger endpoints críticos con Guards.
-2. Eliminar confianza directa en x-ruta-numero proveniente del cliente; derivar ruta desde identidad autenticada.
+1. ✅ Implementar JWT o sesión firmada en backend y proteger endpoints críticos con Guards.
+2. ✅ Eliminar confianza directa en x-ruta-numero proveniente del cliente; derivar ruta desde identidad autenticada.
 
 Prioridad media (datos y despliegue):
 
@@ -287,7 +289,7 @@ Prioridad media (datos y despliegue):
 Prioridad media (calidad contractual):
 
 5. Añadir pruebas de rendimiento automatizadas para endpoints críticos con umbrales de aceptación.
-6. Añadir pruebas de autorización negativa (401/403) sobre modificación de hallazgos e informes.
+6. ✅ Añadir pruebas E2E de autorización negativa (401) sobre endpoints críticos con sesión/token.
 
 Prioridad documental:
 
@@ -299,14 +301,14 @@ Resumen por bloque:
 
 - Historias de usuario (HU): 3/3 en ✅
 - Requisitos funcionales (RF): 9/9 en ✅
-- Requisitos no funcionales (RNF): 2/6 en ✅, 3/6 en 🟡, 1/6 en ⚠️
-- Reglas de negocio clave: mayoría en ✅ con una brecha de enforcement de seguridad en ⚠️
+- Requisitos no funcionales (RNF): 3/6 en ✅, 3/6 en 🟡, 0/6 en ⚠️
+- Reglas de negocio clave: mayoría en ✅, incluyendo enforcement de seguridad por sesión/token
 - Modelo de datos: ✅ funcional, 🟡 en robustez operativa/migraciones
 
 Dictamen global:
 
 - El MVP cumple ampliamente la operación funcional esperada.
-- No alcanza cumplimiento “cerrado” de auditoría formal por seguridad/autorización y trazabilidad de esquema en despliegue.
+- Aún no alcanza cumplimiento “cerrado” de auditoría formal por trazabilidad de esquema en despliegue y evidencia contractual de rendimiento/pruebas automáticas.
 
 ## 14. Conclusión Final
 
@@ -314,9 +316,9 @@ El proyecto se encuentra funcionalmente maduro para uso MVP operativo en consult
 
 Sin embargo, para declarar cumplimiento integral de nivel productivo/auditable, se requiere cerrar tres brechas críticas:
 
-1. Seguridad de acceso a endpoints de escritura (autenticación + autorización fuerte).
-2. Formalización de esquema y cambios por migraciones versionadas.
-3. Evidencia objetiva de rendimiento con pruebas automatizadas y umbrales RNF.
+1. Formalización de esquema y cambios por migraciones versionadas.
+2. Evidencia objetiva de rendimiento con pruebas automatizadas y umbrales RNF.
+3. Cobertura de pruebas automáticas de seguridad (401 y expiración de token) en CI.
 
 Con estas remediaciones, el sistema puede pasar de un cumplimiento funcional alto a un cumplimiento técnico integral verificable.
 

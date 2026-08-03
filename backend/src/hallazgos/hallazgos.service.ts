@@ -8,10 +8,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { CreateHallazgoDto } from '../common/dto/create-hallazgo.dto';
+import { CreateSolicitudDto } from '../common/dto/create-solicitud.dto';
 import { UpdateHallazgoDto } from '../common/dto/update-hallazgo.dto';
 import { Equipo } from '../common/entities/equipo.entity';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
+import { Solicitud } from '../common/entities/solicitud.entity';
 import {
   moveToNextBusinessDay,
   loadConfiguredHolidaySet,
@@ -31,8 +33,138 @@ export class HallazgosService {
     private readonly hallazgosRepository: Repository<Hallazgo>,
     @InjectRepository(Plantilla)
     private readonly plantillasRepository: Repository<Plantilla>,
+    @InjectRepository(Solicitud)
+    private readonly solicitudesRepository: Repository<Solicitud>,
     private readonly dataSource: DataSource,
   ) {}
+
+  async findSolicitudesByHallazgo(hallazgoId: number) {
+    await this.ensureSchema();
+
+    if (!Number.isFinite(hallazgoId) || hallazgoId <= 0) {
+      throw new BadRequestException('El id de hallazgo es invalido.');
+    }
+
+    const exists = await this.hallazgosRepository.findOne({ where: { id: hallazgoId } });
+    if (!exists) {
+      throw new NotFoundException('Hallazgo no encontrado.');
+    }
+
+    const rows = await this.solicitudesRepository.find({
+      where: { idHallazgo: hallazgoId },
+      order: { fechaCreacion: 'DESC' },
+    });
+
+    return rows.map((item) => this.toPublicSolicitud(item));
+  }
+
+  async resolveGoogleFormUrl(rawUrl?: string) {
+    const urlValue = String(rawUrl || '').trim();
+    if (!urlValue) {
+      throw new BadRequestException('Debe enviar la URL del formulario.');
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(urlValue);
+    } catch {
+      throw new BadRequestException('URL de formulario invalida.');
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    if (host !== 'forms.gle' && host !== 'docs.google.com') {
+      throw new BadRequestException('Solo se admiten URLs de Google Forms (forms.gle o docs.google.com).');
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const response = await fetch(parsed.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+
+      const resolved = response.url || parsed.toString();
+      const resolvedHost = (() => {
+        try {
+          return new URL(resolved).hostname.toLowerCase();
+        } catch {
+          return '';
+        }
+      })();
+
+      return {
+        inputUrl: parsed.toString(),
+        resolvedUrl: resolved,
+        requiresAuth: resolvedHost === 'accounts.google.com',
+      };
+    } catch {
+      return {
+        inputUrl: parsed.toString(),
+        resolvedUrl: parsed.toString(),
+        requiresAuth: false,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async listSolicitudesByHallazgoIds(hallazgoIds: number[]) {
+    await this.ensureSchema();
+
+    const ids = Array.from(new Set((hallazgoIds || []).filter((value) => Number.isFinite(value) && value > 0)));
+    if (!ids.length) {
+      return [];
+    }
+
+    const rows = await this.solicitudesRepository.find({
+      where: { idHallazgo: In(ids) },
+      order: { fechaCreacion: 'DESC' },
+    });
+
+    return rows.map((item) => this.toPublicSolicitud(item));
+  }
+
+  async createSolicitud(hallazgoId: number, body: CreateSolicitudDto, usuarioSolicitante: string) {
+    await this.ensureSchema();
+
+    if (!Number.isFinite(hallazgoId) || hallazgoId <= 0) {
+      throw new BadRequestException('El id de hallazgo es invalido.');
+    }
+
+    const hallazgo = await this.hallazgosRepository.findOne({ where: { id: hallazgoId } });
+    if (!hallazgo) {
+      throw new NotFoundException('Hallazgo no encontrado.');
+    }
+
+    const tipo = String(body.tipoSolicitud || '').trim().toUpperCase();
+    if (tipo !== 'COTIZACION' && tipo !== 'PEDIDO') {
+      throw new BadRequestException('tipoSolicitud invalido.');
+    }
+
+    const estado = String(body.estado || 'GENERADA').trim().toUpperCase();
+    const estadosPermitidos = new Set(['GENERADA', 'ENVIADA', 'ATENDIDA', 'CERRADA']);
+    if (!estadosPermitidos.has(estado)) {
+      throw new BadRequestException('estado invalido para solicitud.');
+    }
+
+    const usuario = String(usuarioSolicitante || '').trim() || 'Tecnico ruta';
+
+    const entity = this.solicitudesRepository.create({
+      idHallazgo: hallazgo.id,
+      idEquipo: Number(hallazgo.equipoId),
+      tipoSolicitud: tipo as 'COTIZACION' | 'PEDIDO',
+      usuarioSolicitante: usuario,
+      estado: estado as 'GENERADA' | 'ENVIADA' | 'ATENDIDA' | 'CERRADA',
+      urlFormulario: String(body.urlFormulario || '').trim(),
+      fechaAperturaFormulario: new Date(),
+    });
+
+    const saved = await this.solicitudesRepository.save(entity);
+    return this.toPublicSolicitud(saved);
+  }
 
   async findAll(
     equipoId?: string,
@@ -173,7 +305,8 @@ export class HallazgosService {
     const normalizedRoute = this.normalizeRoute(rutaNumero);
     const payload = await this.normalizeBusinessRules(body, false, normalizedRoute);
     this.assertRequiredFields(payload);
-    await this.assertEquipoExists(payload.equipoId, normalizedRoute);
+    const equipo = await this.assertEquipoExists(payload.equipoId, normalizedRoute);
+    this.assertEquipoActivoParaRegistro(equipo);
     await this.assertNoUnintentionalDuplicate(payload);
 
     try {
@@ -229,6 +362,81 @@ export class HallazgosService {
       this.hallazgosFallback[index] = { ...this.hallazgosFallback[index], ...payload };
       return this.toPublicHallazgo(this.hallazgosFallback[index]);
     }
+  }
+
+  async remove(id: number, rutaNumero?: string) {
+    await this.ensureSchema();
+
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('El id de hallazgo es invalido.');
+    }
+
+    const normalizedRoute = this.normalizeRoute(rutaNumero);
+    const hallazgo = await this.hallazgosRepository.findOne({ where: { id } });
+    if (!hallazgo) {
+      throw new NotFoundException('Hallazgo no encontrado.');
+    }
+
+    const equipo = await this.equiposRepository.findOne({ where: { id: Number(hallazgo.equipoId) } });
+    if (!equipo || !this.belongsToRoute(equipo.rutaNumero, normalizedRoute)) {
+      throw new NotFoundException('Hallazgo no encontrado para la ruta actual.');
+    }
+
+    await this.hallazgosRepository.delete(id);
+    this.removeFromFallbackByIds([id]);
+
+    return {
+      deleted: 1,
+      ids: [id],
+    };
+  }
+
+  async removeMany(ids: number[], rutaNumero?: string) {
+    await this.ensureSchema();
+
+    const uniqueIds = Array.from(new Set((ids || []).map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)));
+    if (!uniqueIds.length) {
+      throw new BadRequestException('Debe enviar al menos un id de hallazgo para eliminar.');
+    }
+
+    const normalizedRoute = this.normalizeRoute(rutaNumero);
+    const hallazgos = await this.hallazgosRepository.find({ where: { id: In(uniqueIds) } });
+    if (hallazgos.length !== uniqueIds.length) {
+      throw new NotFoundException('Uno o más hallazgos no existen.');
+    }
+
+    const equipoIds = Array.from(
+      new Set(
+        hallazgos
+          .map((item) => Number(item.equipoId))
+          .filter((value) => Number.isFinite(value) && value > 0),
+      ),
+    );
+    const equipos = equipoIds.length
+      ? await this.equiposRepository.find({ where: { id: In(equipoIds) } })
+      : [];
+
+    const equiposById = new Map<number, Equipo>();
+    equipos.forEach((equipo) => {
+      equiposById.set(equipo.id, equipo);
+    });
+
+    const unauthorized = hallazgos.some((hallazgo) => {
+      const equipo = equiposById.get(Number(hallazgo.equipoId));
+      return !equipo || !this.belongsToRoute(equipo.rutaNumero, normalizedRoute);
+    });
+
+    if (unauthorized) {
+      throw new NotFoundException('Uno o más hallazgos no pertenecen a la ruta actual.');
+    }
+
+    await this.hallazgosRepository.delete({ id: In(uniqueIds) });
+    this.removeFromFallbackByIds(uniqueIds);
+
+    return {
+      deleted: uniqueIds.length,
+      ids: uniqueIds,
+    };
   }
 
   private async normalizeBusinessRules(
@@ -353,6 +561,21 @@ export class HallazgosService {
           CREATE INDEX IF NOT EXISTS idx_hallazgos_modulo ON hallazgos(modulo);
           CREATE INDEX IF NOT EXISTS idx_hallazgos_mantenimiento_id ON hallazgos(mantenimiento_id);
           CREATE INDEX IF NOT EXISTS idx_hallazgo_estado_historial_hallazgo_id ON hallazgo_estado_historial(hallazgo_id, fecha_cambio DESC);
+
+          CREATE TABLE IF NOT EXISTS solicitudes (
+            id_solicitud BIGSERIAL PRIMARY KEY,
+            id_hallazgo BIGINT NOT NULL REFERENCES hallazgos(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            id_equipo BIGINT NOT NULL REFERENCES equipos(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+            tipo_solicitud VARCHAR(20) NOT NULL CHECK (tipo_solicitud IN ('COTIZACION', 'PEDIDO')),
+            fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
+            usuario_solicitante VARCHAR(160) NOT NULL,
+            estado VARCHAR(20) NOT NULL DEFAULT 'GENERADA' CHECK (estado IN ('GENERADA', 'ENVIADA', 'ATENDIDA', 'CERRADA')),
+            url_formulario TEXT NOT NULL,
+            fecha_apertura_formulario TIMESTAMP NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_solicitudes_hallazgo ON solicitudes(id_hallazgo, fecha_creacion DESC);
+          CREATE INDEX IF NOT EXISTS idx_solicitudes_equipo ON solicitudes(id_equipo, fecha_creacion DESC);
         `)
         .then(() => undefined);
     }
@@ -382,6 +605,15 @@ export class HallazgosService {
 
     if (!this.belongsToRoute(equipo.rutaNumero, rutaNumero)) {
       throw new NotFoundException('Equipo no pertenece a la ruta.');
+    }
+
+    return equipo;
+  }
+
+  private assertEquipoActivoParaRegistro(equipo: Equipo) {
+    const estado = String(equipo.estado ?? '').trim().toUpperCase();
+    if (estado !== 'ACTIVO') {
+      throw new BadRequestException('No se permite registrar hallazgos para equipos inactivos.');
     }
   }
 
@@ -596,5 +828,33 @@ export class HallazgosService {
       `,
       [hallazgoId, normalizedAnterior, normalizedNuevo, motivo],
     );
+  }
+
+  private toPublicSolicitud(solicitud: Solicitud) {
+    return {
+      idSolicitud: Number(solicitud.idSolicitud),
+      idHallazgo: Number(solicitud.idHallazgo),
+      idEquipo: Number(solicitud.idEquipo),
+      tipoSolicitud: solicitud.tipoSolicitud,
+      fechaCreacion: solicitud.fechaCreacion,
+      usuarioSolicitante: solicitud.usuarioSolicitante,
+      estado: solicitud.estado,
+      urlFormulario: solicitud.urlFormulario,
+      fechaAperturaFormulario: solicitud.fechaAperturaFormulario,
+    };
+  }
+
+  private removeFromFallbackByIds(ids: number[]) {
+    const idSet = new Set(ids);
+    if (!idSet.size) {
+      return;
+    }
+
+    for (let index = this.hallazgosFallback.length - 1; index >= 0; index -= 1) {
+      const row = this.hallazgosFallback[index];
+      if (row && idSet.has(Number(row.id))) {
+        this.hallazgosFallback.splice(index, 1);
+      }
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { apiClient } from '@/api/client';
-import type { Hallazgo } from '@/types/domain';
+import type { Hallazgo, Solicitud } from '@/types/domain';
 
 export type CreateHallazgoPayload = {
   equipoId: string;
@@ -21,6 +21,12 @@ export type HallazgosFilters = {
 };
 
 export type UpdateHallazgoEstado = 'ABIERTO' | 'PENDIENTE' | 'SOLUCIONADO';
+
+export type CreateSolicitudPayload = {
+  tipoSolicitud: 'COTIZACION' | 'PEDIDO';
+  urlFormulario: string;
+  estado?: 'GENERADA' | 'ENVIADA' | 'ATENDIDA' | 'CERRADA';
+};
 
 export async function fetchHallazgos(filters: HallazgosFilters) {
   const params = new URLSearchParams();
@@ -58,5 +64,48 @@ export async function updateHallazgoEstado(id: number, estado: UpdateHallazgoEst
   }
 
   const { data } = await apiClient.patch<Hallazgo>(`/hallazgos/${id}`, payload);
+  return data;
+}
+
+export async function deleteHallazgo(id: number) {
+  const { data } = await apiClient.delete<{ deleted: number; ids: number[] }>(`/hallazgos/${id}`);
+  return data;
+}
+
+export async function deleteHallazgos(ids: number[]) {
+  const uniqueIds = Array.from(new Set((ids || []).filter((value) => Number.isFinite(value) && value > 0)));
+  const params = new URLSearchParams();
+  params.set('ids', uniqueIds.join(','));
+  const { data } = await apiClient.delete<{ deleted: number; ids: number[] }>(`/hallazgos?${params.toString()}`);
+  return data;
+}
+
+export async function fetchSolicitudesByHallazgo(hallazgoId: number) {
+  const { data } = await apiClient.get<Solicitud[]>(`/hallazgos/${hallazgoId}/solicitudes`);
+  return data;
+}
+
+export async function fetchSolicitudesByHallazgoIds(hallazgoIds: number[]) {
+  const ids = Array.from(new Set((hallazgoIds || []).filter((value) => Number.isFinite(value) && value > 0)));
+  if (!ids.length) {
+    return [] as Solicitud[];
+  }
+
+  const params = new URLSearchParams();
+  params.set('hallazgoIds', ids.join(','));
+
+  const { data } = await apiClient.get<Solicitud[]>(`/hallazgos/solicitudes/lista?${params.toString()}`);
+  return data;
+}
+
+export async function createSolicitud(hallazgoId: number, payload: CreateSolicitudPayload) {
+  const { data } = await apiClient.post<Solicitud>(`/hallazgos/${hallazgoId}/solicitudes`, payload);
+  return data;
+}
+
+export async function resolveGoogleFormUrl(url: string) {
+  const params = new URLSearchParams();
+  params.set('url', url);
+  const { data } = await apiClient.get<{ inputUrl: string; resolvedUrl: string; requiresAuth?: boolean }>(`/hallazgos/forms/resolve?${params.toString()}`);
   return data;
 }

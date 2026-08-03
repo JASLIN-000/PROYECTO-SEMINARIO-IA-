@@ -40,4 +40,7 @@ export class Equipo {
 
   @Column({ name: 'tipo_contrato', type: 'varchar', length: 5, nullable: true })
   tipoContrato!: string | null;
+
+  @Column({ name: 'programacion_sabado_semana', type: 'smallint', nullable: true })
+  programacionSabadoSemana!: number | null;
 }

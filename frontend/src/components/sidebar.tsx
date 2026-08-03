@@ -19,6 +19,7 @@ const navItems = [
   { to: '/hallazgos', label: 'Hallazgos', icon: TriangleAlert },
   { to: '/informes', label: 'Informes', icon: FileText },
   { to: '/historial', label: 'Historial', icon: Clock3 },
+  { to: '/historial/hallazgos-semana', label: 'Hallazgos Semanales', icon: TriangleAlert },
 ];
 
 type Props = {

@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SolicitudesAsociadasCard } from '@/components/solicitudes-asociadas-card';
+import { useAuth } from '@/hooks/auth-context';
 import { createInforme, previewInforme } from '@/services/informes.service';
 import { cn, formatDate, normalizeText } from '@/lib/utils';
 import type { Equipo, Hallazgo, Plantilla } from '@/types/domain';
@@ -63,6 +65,7 @@ const MAX_MODULES = 3;
 
 export function ReportGeneratorDialog({ open, onOpenChange, equipo, hallazgos, plantillas }: ReportGeneratorDialogProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const editorStorageKey = equipo ? `trazadh-report-draft-${equipo.id}` : null;
 
   const [moduleSearch, setModuleSearch] = useState('');
@@ -465,6 +468,33 @@ export function ReportGeneratorDialog({ open, onOpenChange, equipo, hallazgos, p
                             <p className='text-sm text-[#6B7280]'>No hay hallazgos pendientes para incluir.</p>
                           )}
                         </div>
+
+                        {pendingHallazgos.length ? (
+                          <div className='space-y-3'>
+                            <p className='mb-1 text-xs font-semibold uppercase tracking-wide text-[#6B7280]'>Solicitudes desde este informe</p>
+                            {pendingHallazgos.map((item) => (
+                              <div key={`sol-${item.id}`} className='rounded-xl border border-black/10 bg-white p-3'>
+                                <p className='mb-2 text-sm font-semibold text-[#111827]'>
+                                  HLL-{item.id} · {item.modulo}
+                                </p>
+                                <p className='mb-3 text-xs text-[#6B7280]'>
+                                  {item.descripcionHallazgo}
+                                </p>
+                                <SolicitudesAsociadasCard
+                                  hallazgoId={item.id}
+                                  compact
+                                  context={{
+                                    equipoId: String(equipo?.idEquipo || item.idEquipo || ''),
+                                    nombreEdificio: String(equipo?.nombreEquipo || item.nombreEquipo || ''),
+                                    torreAscensor: String(equipo?.nombreEquipo || item.nombreEquipo || ''),
+                                    rutaNumero: String(equipo?.rutaNumero || user?.rutaNumero || ''),
+                                    solicitante: String(user?.nombre || user?.usuario || 'Tecnico ruta'),
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </CardContent>
                   </Card>

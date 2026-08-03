@@ -23,6 +23,9 @@ export class TecnicoAcceso {
   @Column({ default: true })
   activo!: boolean;
 
+  @Column({ name: 'token_version', type: 'integer', default: 1 })
+  tokenVersion!: number;
+
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'NOW()' })
   createdAt!: Date;
 

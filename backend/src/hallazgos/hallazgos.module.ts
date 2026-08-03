@@ -5,9 +5,10 @@ import { HallazgosService } from './hallazgos.service';
 import { Hallazgo } from '../common/entities/hallazgo.entity';
 import { Equipo } from '../common/entities/equipo.entity';
 import { Plantilla } from '../common/entities/plantilla.entity';
+import { Solicitud } from '../common/entities/solicitud.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Hallazgo, Equipo, Plantilla])],
+  imports: [TypeOrmModule.forFeature([Hallazgo, Equipo, Plantilla, Solicitud])],
   controllers: [HallazgosController],
   providers: [HallazgosService],
 })

@@ -12,6 +12,7 @@ import {
   MapPin,
   Settings2,
   ShieldCheck,
+  Trash2,
   Wrench,
   X,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { EmptyState } from '@/components/empty-state';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import { SearchBar } from '@/components/search-bar';
+import { SolicitudesAsociadasCard } from '@/components/solicitudes-asociadas-card';
 import { Button } from '@/components/ui/button';
 import {
   DialogClose,
@@ -28,9 +30,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useHallazgos } from '@/hooks/use-dashboard';
+import { useAuth } from '@/hooks/auth-context';
 import { formatDate, normalizeText } from '@/lib/utils';
 import { fetchEquiposProgramados } from '@/services/equipos.service';
-import { createHallazgo, updateHallazgoEstado, type UpdateHallazgoEstado } from '@/services/hallazgos.service';
+import { createHallazgo, deleteHallazgos, updateHallazgoEstado, type UpdateHallazgoEstado } from '@/services/hallazgos.service';
 import { fetchPlantillas } from '@/services/informes.service';
 import type { Hallazgo } from '@/types/domain';
 import { toIsoDate } from '@/utils/business-days';
@@ -75,13 +78,16 @@ function estadoSelectTone(estado: string): string {
 
 export function HallazgosPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [estado, setEstado] = useState('');
   const [equipo, setEquipo] = useState('');
   const [nombreEquipo, setNombreEquipo] = useState('');
   const [selected, setSelected] = useState<Hallazgo | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createdHallazgoForSolicitudes, setCreatedHallazgoForSolicitudes] = useState<Hallazgo | null>(null);
   const [updatingEstadoId, setUpdatingEstadoId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [createForm, setCreateForm] = useState({
     equipoId: '',
     nombreEquipo: '',
@@ -149,20 +155,20 @@ export function HallazgosPage() {
           ? { fechaSolucion: createForm.fechaSolucion }
           : {}),
       }),
-    onSuccess: async () => {
+    onSuccess: async (savedHallazgo) => {
       await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      setCreateOpen(false);
+      setCreatedHallazgoForSolicitudes(savedHallazgo);
       setCreateForm((current) => ({
         ...current,
-        mantenimientoId: '',
-        modulo: '',
-        descripcionHallazgo: '',
+        mantenimientoId: current.mantenimientoId,
+        modulo: current.modulo,
+        descripcionHallazgo: current.descripcionHallazgo,
         observacionesAdicionales: '',
         accionInmediata: '',
         prioridad: 'MEDIA',
-        estado: 'PENDIENTE',
-        fechaHallazgo: toIsoDate(new Date()),
-        fechaSolucion: '',
+        estado: current.estado,
+        fechaHallazgo: current.fechaHallazgo,
+        fechaSolucion: current.fechaSolucion,
       }));
     },
   });
@@ -177,6 +183,19 @@ export function HallazgosPage() {
     },
     onSettled: () => {
       setUpdatingEstadoId(null);
+    },
+  });
+
+  const deleteHallazgosMutation = useMutation({
+    mutationFn: (ids: number[]) => deleteHallazgos(ids),
+    onSuccess: async (result) => {
+      const removedIds = result?.ids ?? [];
+      await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      setSelectedIds((current) => current.filter((id) => !removedIds.includes(id)));
+
+      if (selected && removedIds.includes(selected.id)) {
+        setSelected(null);
+      }
     },
   });
 
@@ -211,6 +230,8 @@ export function HallazgosPage() {
     }) ?? null;
   }, [createForm.equipoId, equiposCatalogQuery.data?.equipos]);
 
+  const selectedEquipoIsActive = String(selectedEquipoFromCatalog?.estado || '').trim().toUpperCase() === 'ACTIVO';
+
   const equipoSuggestions = useMemo(() => {
     const term = createForm.equipoId.trim();
     if (!term) {
@@ -243,6 +264,7 @@ export function HallazgosPage() {
 
   useEffect(() => {
     if (!createOpen) {
+      setCreatedHallazgoForSolicitudes(null);
       return;
     }
 
@@ -250,6 +272,18 @@ export function HallazgosPage() {
       setCreateForm((current) => ({ ...current, equipoId: equipo.trim() }));
     }
   }, [createForm.equipoId, createOpen, equipo]);
+
+  useEffect(() => {
+    if (!createdHallazgoForSolicitudes) {
+      return;
+    }
+
+    const createdEquipoCode = normalizeText(createdHallazgoForSolicitudes.idEquipo ?? '');
+    const currentEquipoCode = normalizeText(createForm.equipoId);
+    if (createdEquipoCode && currentEquipoCode && createdEquipoCode !== currentEquipoCode) {
+      setCreatedHallazgoForSolicitudes(null);
+    }
+  }, [createForm.equipoId, createdHallazgoForSolicitudes]);
 
   useEffect(() => {
     if (!createForm.equipoId.trim()) {
@@ -276,8 +310,55 @@ export function HallazgosPage() {
     });
   }, [createForm.equipoId, selectedEquipoFromCatalog]);
 
+  useEffect(() => {
+    const validIds = new Set((query.data ?? []).map((item) => item.id));
+    setSelectedIds((current) => current.filter((id) => validIds.has(id)));
+  }, [query.data]);
+
+  const toggleSelectedHallazgo = (id: number, checked: boolean) => {
+    setSelectedIds((current) => {
+      if (checked) {
+        if (current.includes(id)) {
+          return current;
+        }
+        return [...current, id];
+      }
+
+      return current.filter((value) => value !== id);
+    });
+  };
+
+  const removeSelectedHallazgos = () => {
+    if (!selectedIds.length || deleteHallazgosMutation.isPending) {
+      return;
+    }
+
+    const confirmed = window.confirm(`¿Deseas quitar ${selectedIds.length} hallazgo(s) seleccionados? Esta acción no se puede deshacer.`);
+    if (!confirmed) {
+      return;
+    }
+
+    deleteHallazgosMutation.mutate(selectedIds);
+  };
+
   const columns = useMemo<ColumnDef<Hallazgo>[]>(
     () => [
+      {
+        id: 'select',
+        header: '',
+        cell: ({ row }) => {
+          const id = row.original.id;
+          const checked = selectedIds.includes(id);
+          return (
+            <input
+              type='checkbox'
+              aria-label={`Seleccionar hallazgo ${id}`}
+              checked={checked}
+              onChange={(event) => toggleSelectedHallazgo(id, event.target.checked)}
+            />
+          );
+        },
+      },
       {
         accessorKey: 'fechaHallazgo',
         header: ({ column }) => (
@@ -342,7 +423,7 @@ export function HallazgosPage() {
         ),
       },
     ],
-    [updateEstadoMutation, updatingEstadoId],
+    [updateEstadoMutation, updatingEstadoId, selectedIds],
   );
 
   return (
@@ -351,7 +432,20 @@ export function HallazgosPage() {
         title='Hallazgos'
         description='Consulta y revisa los ultimos hallazgos registrados.'
         actions={(
-          <Button onClick={() => setCreateOpen(true)}>Agregar hallazgo</Button>
+          <div className='flex flex-wrap items-center gap-2'>
+            <Button
+              variant='outline'
+              className='border-[#A11D2E] text-[#A11D2E] hover:bg-[#FDF4F6]'
+              disabled={!selectedIds.length || deleteHallazgosMutation.isPending}
+              onClick={removeSelectedHallazgos}
+            >
+              <Trash2 className='mr-2 h-4 w-4' />
+              {deleteHallazgosMutation.isPending
+                ? 'Quitando...'
+                : `Quitar hallazgos${selectedIds.length ? ` (${selectedIds.length})` : ''}`}
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>Agregar hallazgo</Button>
+          </div>
         )}
       />
 
@@ -360,9 +454,18 @@ export function HallazgosPage() {
         <Input value={equipo} onChange={(event) => setEquipo(event.target.value)} placeholder='Filtrar por codigo equipo' />
         <Input value={estado} onChange={(event) => setEstado(event.target.value)} placeholder='Filtrar por estado' />
       </div>
+      <p className='text-xs text-[#6B7280]'>
+        Seleccionados para quitar: <span className='font-semibold text-[#111827]'>{selectedIds.length}</span>
+      </p>
 
       {query.isLoading ? <LoadingSpinner label='Cargando hallazgos...' /> : null}
       {query.isError ? <EmptyState title='Error al cargar hallazgos' description='Intenta nuevamente.' /> : null}
+      {deleteHallazgosMutation.isError ? (
+        <p className='inline-flex items-center gap-2 rounded-xl border border-[#F6C5CB] bg-[#FDECEC] px-3 py-2 text-sm text-[#B42318]'>
+          <AlertCircle className='h-4 w-4' />
+          {(deleteHallazgosMutation.error as Error).message}
+        </p>
+      ) : null}
       {!query.isLoading && !query.isError ? <DataTable columns={columns} data={query.data ?? []} searchPlaceholder='Buscar en resultados...' /> : null}
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
@@ -693,6 +796,17 @@ export function HallazgosPage() {
                       </div>
                     </div>
                   </section>
+
+                  <SolicitudesAsociadasCard
+                    hallazgoId={createdHallazgoForSolicitudes?.id ?? null}
+                    context={{
+                      equipoId: String(createForm.equipoId || createdHallazgoForSolicitudes?.idEquipo || ''),
+                      nombreEdificio: String(createForm.nombreEquipo || createdHallazgoForSolicitudes?.nombreEquipo || ''),
+                      torreAscensor: String(createForm.nombreEquipo || createdHallazgoForSolicitudes?.nombreEquipo || ''),
+                      rutaNumero: String(selectedEquipoFromCatalog?.rutaNumero || user?.rutaNumero || ''),
+                      solicitante: String(user?.nombre || user?.usuario || 'Tecnico ruta'),
+                    }}
+                  />
                 </div>
 
                 <aside className='space-y-4'>
@@ -703,7 +817,13 @@ export function HallazgosPage() {
                       <InfoLine icon={ShieldCheck} label='ID' value={createForm.equipoId || 'No disponible'} />
                       <div className='flex items-center justify-between rounded-lg border border-black/5 bg-[#F9FAFB] px-3 py-2'>
                         <span className='text-xs font-medium text-[#6B7280]'>Estado</span>
-                        <span className='rounded-full bg-[#EAF8EF] px-2.5 py-1 text-xs font-semibold text-[#166534]'>ACTIVO</span>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${selectedEquipoIsActive
+                            ? 'bg-[#EAF8EF] text-[#166534]'
+                            : 'bg-[#FDECEC] text-[#A11D2E]'}`}
+                        >
+                          {selectedEquipoFromCatalog ? (selectedEquipoIsActive ? 'ACTIVO' : 'INACTIVO') : 'SIN DATOS'}
+                        </span>
                       </div>
                       <InfoLine icon={MapPin} label='Ruta' value='No disponible' />
                       <InfoLine icon={CalendarDays} label='Día hábil (DH)' value={createForm.fechaHallazgo || '-'} />
@@ -750,6 +870,7 @@ export function HallazgosPage() {
                   disabled={
                     createMutation.isPending ||
                     !createForm.equipoId.trim() ||
+                    (selectedEquipoFromCatalog !== null && !selectedEquipoIsActive) ||
                     !createForm.tipoMantenimiento.trim() ||
                     !createForm.modulo.trim() ||
                     !createForm.descripcionHallazgo.trim() ||
@@ -757,7 +878,13 @@ export function HallazgosPage() {
                   }
                   className='h-11 rounded-xl bg-[#A11D2E] px-6 text-white transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#8A1627]'
                 >
-                  {createMutation.isPending ? 'Guardando...' : 'Guardar hallazgo'}
+                  {createMutation.isPending
+                    ? 'Guardando...'
+                    : createdHallazgoForSolicitudes
+                      ? `Hallazgo #${createdHallazgoForSolicitudes.id} guardado`
+                    : (selectedEquipoFromCatalog !== null && !selectedEquipoIsActive
+                        ? 'INACTIVO - solo historial'
+                        : 'Guardar hallazgo')}
                 </Button>
               </div>
             </footer>

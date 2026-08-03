@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ListFilter, Sparkles } from 'lucide-react';
+import { ArrowLeft, ListFilter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/empty-state';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -84,16 +84,18 @@ export function InformesPage() {
     setSearchParams,
   ]);
 
-  const hasInitialError = equiposQuery.isError || hallazgosQuery.isError || plantillasQuery.isError || informesQuery.isError;
-  const isInitialLoading = equiposQuery.isLoading || hallazgosQuery.isLoading || plantillasQuery.isLoading || informesQuery.isLoading;
+  const hasInitialError =
+    equiposQuery.isError || hallazgosQuery.isError || plantillasQuery.isError || informesQuery.isError;
+  const isInitialLoading =
+    equiposQuery.isLoading || hallazgosQuery.isLoading || plantillasQuery.isLoading || informesQuery.isLoading;
 
   const errorMessage = useMemo(() => {
-    const sourceError = equiposQuery.error ?? hallazgosQuery.error ?? plantillasQuery.error ?? informesQuery.error;
+    const sourceError =
+      equiposQuery.error ?? hallazgosQuery.error ?? plantillasQuery.error ?? informesQuery.error;
     return getErrorMessage(sourceError, 'No fue posible cargar el workspace de informes.');
   }, [equiposQuery.error, hallazgosQuery.error, informesQuery.error, plantillasQuery.error]);
 
   const informes = useMemo(() => informesQuery.data ?? EMPTY_INFORMES, [informesQuery.data]);
-
   const filteredInformes = useMemo(() => {
     const term = normalizeText(reportSearch);
 
@@ -165,6 +167,11 @@ export function InformesPage() {
         return;
       }
 
+      if (String(match.estado || '').trim().toUpperCase() !== 'ACTIVO') {
+        setManualLookupError('El equipo esta inactivo. Solo puedes consultar su historial, no generar informes.');
+        return;
+      }
+
       setManualLookupError('');
       setSelectedEquipo(match);
     };
@@ -179,11 +186,10 @@ export function InformesPage() {
         <Card className='border-black/5'>
           <CardContent className='space-y-3 p-4'>
             <div className='flex items-center gap-2'>
-              <Sparkles className='h-4 w-4 text-[#A11D2E]' />
-              <h2 className='text-sm font-semibold text-[#111827]'>Generar informe</h2>
+              <h2 className='text-sm font-medium text-[#374151]'>Generar informe puntual</h2>
             </div>
 
-            <div className='grid gap-2 rounded-xl border border-black/5 bg-[#FCFCFD] p-3 sm:grid-cols-[1fr_auto]'>
+            <div className='grid gap-2 rounded-xl border border-black/5 bg-white p-3 sm:grid-cols-[1fr_auto]'>
               <Input
                 value={manualEquipoInput}
                 onChange={(event) => {
@@ -200,7 +206,7 @@ export function InformesPage() {
                   }
                 }}
               />
-              <Button onClick={handleManualOpen}>Abrir visual</Button>
+              <Button variant='outline' onClick={handleManualOpen}>Abrir</Button>
             </div>
 
             {manualLookupError ? <p className='text-xs text-[#C62828]'>{manualLookupError}</p> : null}

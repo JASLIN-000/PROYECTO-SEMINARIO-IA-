@@ -9,6 +9,7 @@ const SearchEquiposPage = lazy(() => import('@/pages/search-equipos-page').then(
 const HallazgosPage = lazy(() => import('@/pages/hallazgos-page').then((module) => ({ default: module.HallazgosPage })));
 const InformesPage = lazy(() => import('@/pages/informes-page').then((module) => ({ default: module.InformesPage })));
 const HistorialPage = lazy(() => import('@/pages/historial-page').then((module) => ({ default: module.HistorialPage })));
+const HallazgosSemanaPage = lazy(() => import('@/pages/hallazgos-semana-page').then((module) => ({ default: module.HallazgosSemanaPage })));
 const ConfiguracionPage = lazy(() => import('@/pages/configuracion-page').then((module) => ({ default: module.ConfiguracionPage })));
 
 export function AppRoutes() {
@@ -28,6 +29,7 @@ export function AppRoutes() {
           <Route path='/hallazgos' element={<HallazgosPage />} />
           <Route path='/informes' element={<InformesPage />} />
           <Route path='/historial' element={<HistorialPage />} />
+          <Route path='/historial/hallazgos-semana' element={<HallazgosSemanaPage />} />
           <Route path='/configuracion' element={<ConfiguracionPage />} />
         </Route>
         <Route path='*' element={<Navigate to='/' replace />} />

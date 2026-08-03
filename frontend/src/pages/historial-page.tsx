@@ -1,19 +1,33 @@
 import { motion } from 'framer-motion';
 import { Clock3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/empty-state';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
+import { Button } from '@/components/ui/button';
+import { WeeklyReportsPanel } from '@/components/weekly-reports-panel';
 import { useInformes } from '@/hooks/use-dashboard';
 import { formatDate } from '@/lib/utils';
 
 export function HistorialPage() {
+  const navigate = useNavigate();
   const query = useInformes();
 
   return (
     <section className='space-y-6'>
-      <PageHeader title='Historial de mantenimientos' description='Linea de tiempo de intervenciones realizadas.' />
+      <PageHeader
+        title='Historial de mantenimientos'
+        description='Linea de tiempo de intervenciones realizadas.'
+        actions={(
+          <Button variant='outline' onClick={() => navigate('/historial/hallazgos-semana')}>
+            Ver hoja completa semanal
+          </Button>
+        )}
+      />
+
+      <WeeklyReportsPanel />
 
       {query.isLoading ? <LoadingSpinner label='Cargando historial...' /> : null}
       {query.isError ? <EmptyState title='No fue posible cargar el historial' description='Intenta nuevamente.' /> : null}

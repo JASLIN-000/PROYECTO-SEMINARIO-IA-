@@ -93,7 +93,9 @@ export function HomePage() {
               <Button
                 size='lg'
                 onClick={() => {
-                  const firstEquipo = query.data?.equipos?.[0];
+                  const firstEquipo = query.data?.equipos?.find(
+                    (item) => String(item.estado || '').trim().toUpperCase() === 'ACTIVO',
+                  );
                   if (!firstEquipo) {
                     navigate('/informes?generar=1');
                     return;
@@ -117,6 +119,7 @@ export function HomePage() {
               date={selectedDate}
               onDateChange={(value) => value && setSelectedDate(value)}
               calendarContext={query.data?.calendario}
+              hasEquiposForSelectedDate={(query.data?.equipos.length ?? 0) > 0}
             />
           </div>
 
@@ -211,8 +214,12 @@ export function HomePage() {
                 <h2 className='mt-2 font-display text-2xl font-bold text-[#111827]'>{historyEquipo?.idEquipo}</h2>
                 <p className='mt-1 text-sm text-[#6B7280]'>{historyEquipo?.nombreEquipo}</p>
                 <div className='mt-4'>
+                  {String(historyEquipo?.estado || '').trim().toUpperCase() !== 'ACTIVO' ? (
+                    <p className='text-xs font-semibold uppercase tracking-[0.12em] text-[#A11D2E]'>INACTIVO - solo historial</p>
+                  ) : null}
                   <Button
                     size='sm'
+                    disabled={String(historyEquipo?.estado || '').trim().toUpperCase() !== 'ACTIVO'}
                     onClick={() => {
                       if (!historyEquipo) {
                         return;

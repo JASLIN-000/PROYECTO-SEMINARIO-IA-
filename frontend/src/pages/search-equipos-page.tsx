@@ -144,11 +144,26 @@ export function SearchEquiposPage() {
 
               <Button
                 onClick={() => {
+                  if (String(selected.estado || '').trim().toUpperCase() !== 'ACTIVO') {
+                    return;
+                  }
+
                   navigate(`/informes?equipoId=${selected.id}&equipoCodigo=${encodeURIComponent(selected.idEquipo)}`);
                   setSelected(null);
                 }}
+                disabled={String(selected.estado || '').trim().toUpperCase() !== 'ACTIVO'}
               >
-                Generar informe
+                {String(selected.estado || '').trim().toUpperCase() === 'ACTIVO' ? 'Generar informe' : 'INACTIVO'}
+              </Button>
+
+              <Button
+                variant='outline'
+                onClick={() => {
+                  navigate(`/hallazgos?equipoId=${encodeURIComponent(selected.idEquipo)}`);
+                  setSelected(null);
+                }}
+              >
+                Ver historial
               </Button>
             </div>
           ) : null}

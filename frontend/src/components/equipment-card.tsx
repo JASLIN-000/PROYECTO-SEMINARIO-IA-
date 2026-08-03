@@ -13,6 +13,7 @@ type Props = {
 
 export function EquipmentCard({ equipo, onViewHistory, onGenerateReport }: Props) {
   const status = getEquipmentStatus(equipo.estado);
+  const isActive = String(equipo.estado ?? '').trim().toUpperCase() === 'ACTIVO';
 
   return (
     <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.2 }}>
@@ -41,7 +42,7 @@ export function EquipmentCard({ equipo, onViewHistory, onGenerateReport }: Props
                   </div>
                   <div className='flex items-center gap-2'>
                     <Clock3 className='h-4 w-4 text-[#8E0000]' />
-                    <span>{equipo.horaProgramada ?? '08:00 - 12:00'}</span>
+                    <span>{equipo.horaProgramada ?? 'Sin programacion'}</span>
                   </div>
                 </div>
               </div>
@@ -60,8 +61,13 @@ export function EquipmentCard({ equipo, onViewHistory, onGenerateReport }: Props
                 <Button variant='outline' size='sm' className='h-9' onClick={() => onViewHistory?.(equipo)}>
                   <History className='mr-2 h-4 w-4' /> Ver historial
                 </Button>
-                <Button size='sm' className='h-9' onClick={() => onGenerateReport?.(equipo)}>
-                  <FileText className='mr-2 h-4 w-4' /> Generar informe
+                <Button
+                  size='sm'
+                  className='h-9'
+                  onClick={() => onGenerateReport?.(equipo)}
+                  disabled={!isActive}
+                >
+                  <FileText className='mr-2 h-4 w-4' /> {isActive ? 'Generar informe' : 'INACTIVO'}
                 </Button>
               </div>
             </div>
@@ -80,7 +86,7 @@ function getEquipmentStatus(rawStatus?: string | null) {
   }
 
   if (normalized.includes('FUERA') || normalized.includes('INACT') || normalized.includes('SUSP')) {
-    return { label: 'Fuera de servicio', variant: 'neutral' as const };
+    return { label: 'INACTIVO', variant: 'neutral' as const };
   }
 
   return { label: 'Operativo', variant: 'default' as const };

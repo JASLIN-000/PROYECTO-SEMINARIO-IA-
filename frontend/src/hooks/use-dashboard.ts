@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchBusinessCalendarMonth } from '@/services/calendar.service';
 import { fetchEquiposProgramados } from '@/services/equipos.service';
 import { fetchHallazgos, type HallazgosFilters } from '@/services/hallazgos.service';
-import { fetchInformes } from '@/services/informes.service';
+import { fetchInformes, fetchInformesSemanales } from '@/services/informes.service';
 import { normalizeText } from '@/lib/utils';
 
 export function useEquiposProgramados(fechaIso: string, search = '') {
@@ -61,6 +61,14 @@ export function useInformes() {
   return useQuery({
     queryKey: ['informes'],
     queryFn: fetchInformes,
+    retry: 2,
+  });
+}
+
+export function useInformesSemanales() {
+  return useQuery({
+    queryKey: ['informes-semanales'],
+    queryFn: fetchInformesSemanales,
     retry: 2,
   });
 }
